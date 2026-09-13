@@ -133,7 +133,14 @@
     }
 
     var banner = h('button', { 'class': 'reward-banner', 'data-act': 'reward-banner', hidden: 'hidden', onclick: openReward });
+    // 隨時可清除本活動紀錄：老師測試過、或換同學用同一台平板時使用（不必等到全部過關）
+    var tools = h('div', { 'class': 'lv-tools' }, [
+      h('button', { 'class': 'btn small', 'data-act': 'clear-progress', text: '清除這個活動的紀錄', onclick: function () {
+        if (root.confirm('要清除「' + title + '」的練習紀錄嗎？\n所有打勾、課堂實作卡和過關紀錄都會清掉。')) clearAll();
+      } })
+    ]);
     navBox.parentNode.insertBefore(banner, navBox);
+    navBox.parentNode.insertBefore(tools, navBox);
     function updateBanner() {
       var t = rewardTime(pageKey);
       banner.hidden = !t;

@@ -160,6 +160,8 @@ input.num.badf { border-color: var(--bad); background: var(--bad-bg); }
 .reward-big { font-size: 2.2rem; font-weight: 800; color: var(--accent); margin: 6px 0; }
 .reward-stars { font-size: 2.4rem; letter-spacing: 6px; }
 .reward-meta { font-size: 1rem; color: var(--ink); margin: 10px 0 6px; }
+.lv-tools { display: flex; justify-content: flex-end; margin: 4px 0; }
+button.btn.small { min-height: 48px; font-size: .95rem; color: var(--muted); border-color: var(--line); }
 .confetti span { position: absolute; top: -40px; font-size: 34px; animation: confetti-fall 2.6s linear infinite; }
 @keyframes reward-pop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes reward-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }

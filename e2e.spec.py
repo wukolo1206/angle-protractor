@@ -253,6 +253,21 @@ def run(pg):
     ck(pg.is_visible('a.card[href="act4.html"] .trophy'), '首頁活動四卡片顯示 🏆')
     ck(not pg.is_visible('a.card[href="act1.html"] .trophy'), '首頁活動一沒有 🏆（尚未全部過關）')
 
+    # ── 隨時清除本活動紀錄 ──
+    print('== 清除紀錄')
+    pg.goto(BASE + 'act4.html'); pg.wait_for_load_state('networkidle'); pg.click('button[data-tab=practice]')
+    ck(pg.is_visible('[data-act=clear-progress]'), '練習分頁上方有「清除這個活動的紀錄」按鈕')
+    pg.once('dialog', lambda d: d.dismiss())
+    pg.click('[data-act=clear-progress]'); pg.wait_for_timeout(300)
+    ck(pg.eval_on_selector_all('#lvNav button.done', 'e=>e.length') == 10, '按「取消」→ 紀錄不變')
+    pg.once('dialog', lambda d: d.accept())
+    pg.click('[data-act=clear-progress]'); pg.wait_for_load_state('networkidle'); pg.wait_for_timeout(300)
+    pg.click('button[data-tab=practice]')
+    ck(pg.eval_on_selector_all('#lvNav button.done', 'e=>e.length') == 0 and not pg.is_visible('[data-act=reward-banner]'),
+       '按「確定」→ 打勾與過關橫幅都清掉')
+    pg.goto(BASE + 'index.html'); pg.wait_for_load_state('networkidle')
+    ck(not pg.is_visible('a.card[href="act4.html"] .trophy'), '清除後首頁活動四不再顯示 🏆')
+
 
 def main():
     with sync_playwright() as p:
