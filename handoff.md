@@ -5,6 +5,8 @@
 - GitHub：https://github.com/wukolo1206/angle-protractor
 - 網址：https://wukolo1206.github.io/angle-protractor/
 - 2026-09-13 安裝 GitHub CLI（`C:\Program Files\GitHub CLI\gh.exe`）並登入 wukolo1206，用 `gh repo create` 建 repo、`gh api` 開 Pages
+- 已加入 **Vibe Coding 資源庫**（專案統整網頁的試算表 `1bjyBnYAB7CAT7cmoaXnHrDewzjrzgMonzsD4dVDAC-8`，工作表1 第 45 列）：
+  名稱「四上U3 角度（量角器與角度）」、大類 學科、小類 數學（四上）、排序 1130（接在 U1＝1110、U2＝1120 之後）
 - 設計規格 v1.2：`../docs/superpowers/specs/2026-09-13-u3-angle-design.md`
 - 已同步：`../專案總表.md`、`../CLAUDE.md` 子工具一覽、`knowledge-map/data/units.json` 的 `tools`、`../docs/互動教具設計流程.md`（U3 心得）
 
