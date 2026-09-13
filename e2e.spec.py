@@ -119,6 +119,28 @@ def run(pg):
             changed = True
             break
     ck(changed and pg.is_enabled('#exCtrl [data-act=step1]') and pg.is_disabled('#exCtrl [data-act=step3]'), '三步驟：「換一個角」出新角並重設步驟')
+
+    # 探索：附件7 實測（問3）——不判對錯，自己和同學比一比
+    pg.click('button[data-ex=e-att]')
+    for i, (me, mate) in enumerate([(40, 41), (120, 124), (65, 65), (150, 150)], start=1):
+        pg.fill('#exCtrl input[data-f=me%d]' % i, str(me))
+        pg.fill('#exCtrl input[data-f=mate%d]' % i, str(mate))
+    pg.click('#exCtrl [data-act=compare]')
+    t = pg.inner_text('#exMsg')
+    ck('∠2 差 4°' in t and '再一起量一次' in t and '∠1 差' not in t, '附件7：兩人差超過 2° 的角才提醒再一起量')
+
+    # 探索：畫角步驟（問9）
+    pg.click('button[data-ex=e-draw]')
+    ck('做一個記號' in pg.inner_text('#exCtrl') and '連成一直線' in pg.inner_text('#exCtrl'), '畫角：右側列出課本四個步驟')
+    for s in (1, 2, 3, 4):
+        pg.wait_for_selector('#exCtrl [data-act=draw%d]:not([disabled])' % s)
+        pg.click('#exCtrl [data-act=draw%d]' % s)
+        pg.wait_for_timeout(2000 if s in (2, 4) else 1500)  # 步驟②移動＋旋轉、步驟④移開＋連線，動畫各約 1.6 秒
+    target = int(pg.get_attribute('#exSvg [data-target]', 'data-target'))
+    ang = pg.evaluate('''()=>{const f=s=>{const l=document.querySelector(s);return Math.atan2(-(+l.getAttribute('y2')-+l.getAttribute('y1')),+l.getAttribute('x2')-+l.getAttribute('x1'))*180/Math.PI;};
+      const d=Math.abs(((f('#exSvg line[data-drawn]')-f('#exSvg line[data-base]'))%360+540)%360-180);return d;}''')
+    ck(abs(ang - target) <= 1, '畫角：步驟④畫出的角等於題目度數（%s° vs %s°）' % (round(ang, 1), target))
+    ck('連成一直線' in pg.inner_text('#exMsg'), '畫角：步驟④說明拿開量角器、連成一直線')
     pg.click('button[data-tab=practice]'); pg.click('button[data-level=l2]')
     ck(pg.is_disabled('#lvStage input[data-f=ans]'), '自己量：擺好前讀數格停用')
     ring_r = pg.evaluate('''()=>{const d=document.querySelector('#lvStage .ring-handle').getAttribute('d');return +d.split(' A ')[1].split(' ')[0];}''')
@@ -160,11 +182,11 @@ def run(pg):
         drag(pg, frm, to)
     ck(not pg.is_disabled('#lvStage input[data-f=ans]'), '邊太短：延長後讀數格解鎖')
 
-    pg.click('button[data-level=c3]')
-    ck(pg.is_visible('#lvStage [data-card="act2-q3"]'), '附件7 顯示課堂實作卡')
-    ck(pg.evaluate("document.querySelector('#lvNav button.on').dataset.level") == 'c3', '實作卡未按鈕前停在該關')
+    pg.click('button[data-level=c-p46]')
+    ck(pg.is_visible('#lvStage [data-card="act2-p46-1"]'), '練習百分百第1題 顯示課堂實作卡')
+    ck(pg.evaluate("document.querySelector('#lvNav button.on').dataset.level") == 'c-p46', '實作卡未按鈕前停在該關')
     pg.click('#lvStage [data-act=later]')
-    ck(pg.evaluate("document.querySelector('#lvNav button.on').dataset.level") == 'l4', '按「稍後在課堂做」後進下一關')
+    ck('later' in (pg.get_attribute('button[data-level=c-p46]', 'class') or ''), '按「稍後在課堂做」後關卡標為稍後')
 
     pg.click('button[data-level=l4]')
     ck(not pg.is_visible('#lvStage [data-reason]'), '量法對嗎：選「不正確」之前不顯示原因按鈕（hidden 不可被 .row 蓋掉）')
@@ -189,6 +211,66 @@ def run(pg):
     pg.click('#lvStage [data-pick="2"]'); pg.click('#lvStage [data-pick="6"]')
     pg.click('#lvStage [data-act=check2]')
     ck('都是 45°' in msg(pg), '三角板②：選 ∠4、∠6、45 度 → 答對')
+
+    # 問6 量課本圖的角 → 分類拖放 → 做做看
+    pg.click('button[data-level=l-cls]')
+    ck('現在量 ∠1' in pg.inner_text('#lvStage .q'), '分類：一次量一個角，從 ∠1 開始')
+    ck(not pg.is_visible('#lvStage [data-bin=eq]'), '分類：量完之前不顯示分類格子')
+    for n, d in [(1, 90), (2, 69), (3, 125), (4, 101), (5, 90), (6, 25)]:
+        pg.wait_for_selector('#lvStage [data-act=check]:not([disabled])')
+        pg.fill('#lvStage input[data-f=ans]', str(d)); pg.click('#lvStage [data-act=check]')
+        pg.wait_for_timeout(850)
+    ck('拖到正確的格子' in pg.inner_text('#lvStage .q'), '分類：6 個角量完進入拖放分類')
+    vals = pg.eval_on_selector_all('#lvStage svg [data-val]', 'e=>e.map(x=>x.textContent)')
+    ck(vals == ['90°', '70°', '125°', '100°', '90°', '25°'], '分類：角旁寫上課本圖量得的度數')
+
+    def tap_angle(n):
+        c = center_of(pg, '#lvStage svg [data-angle="%d"] line' % n)
+        pg.mouse.click(c[0], c[1]); pg.wait_for_timeout(100)
+
+    def tap_bin(key):
+        c = center_of(pg, '#lvStage svg [data-bin=%s]' % key)
+        pg.mouse.click(c[0], c[1]); pg.wait_for_timeout(150)
+
+    tap_angle(3); tap_bin('lt')
+    ck('再放一次' in msg(pg), '分類：∠3（125°）放到「小於 90°」→ 退回並提示')
+    tap_angle(3); tap_bin('gt')
+    ck('鈍角' in msg(pg), '分類：∠3 放到「大於 90°」→ 鈍角')
+    # 真的拖曳一次：∠6 拖到「小於 90°」
+    a6 = center_of(pg, '#lvStage svg [data-angle="6"] line')
+    b_lt = center_of(pg, '#lvStage svg [data-bin=lt]')
+    drag(pg, a6, b_lt, 12); pg.wait_for_timeout(150)
+    ck('銳角' in msg(pg), '分類：拖曳 ∠6 到「小於 90°」→ 銳角')
+    for n, key in [(1, 'eq'), (2, 'lt'), (4, 'gt'), (5, 'eq')]:
+        tap_angle(n); tap_bin(key)
+    pg.wait_for_timeout(1100)
+    ck(pg.is_visible('#lvStage [data-tf="1-x"]'), '分類：6 個角放完進入做做看')
+    pg.click('#lvStage [data-tf="1-o"]')
+    ck('直角是幾度' in msg(pg), '做做看①：「比 90 度小的角稱為直角」選 ○ → 提示')
+    pg.click('#lvStage [data-tf="1-x"]'); pg.click('#lvStage [data-tf="2-o"]')
+    ck('鈍角' in msg(pg) and pg.is_visible('#lvStage [data-act=next]'), '做做看：兩題答對 → 本關完成')
+
+    # 問8 拼平角：自由移動，找 2 種拼法過關
+    pg.click('button[data-level=l-flat]')
+    sum_text = lambda: pg.inner_text('#lvStage [data-f=sum]')
+    pg.click('#lvStage [data-add="90"]')
+    ck('還差 90°' in sum_text(), '拼平角：放一個 90° → 還差 90°')
+    pg.click('#lvStage [data-add="90"]')
+    ck('拼成平角' in sum_text() and '90°＋90°' in pg.inner_text('#lvStage [data-f=found]'), '拼平角：90°＋90° → 拼成平角並記錄')
+    ck(not pg.is_visible('#lvStage [data-act=next]'), '拼平角：只找到 1 種還不能過關')
+    pg.click('#lvStage [data-add="30"]')
+    ck('超過 180°' in sum_text(), '拼平角：再加 30° → 超過 180° 提示')
+    pg.click('#lvStage [data-act=clear-pieces]')
+    # 自由拖曳：放 30° 後拖到直線中間，應提示要從一端接起
+    pg.click('#lvStage [data-add="30"]')
+    wc = center_of(pg, '#lvStage svg [data-piece="30"] path')
+    tgt = to_client(pg, '#lvStage svg', 320 + 150 * math.cos(math.radians(95)), 380 - 150 * math.sin(math.radians(95)))
+    drag(pg, wc, tgt, 12)
+    ck('從直線的一端開始' in sum_text(), '拼平角：把角拖離直線一端 → 提示一個接一個排')
+    pg.click('#lvStage [data-act=clear-pieces]')
+    for d in (45, 45, 90):
+        pg.click('#lvStage [data-add="%d"]' % d)
+    ck('2 種' in pg.inner_text('#lvStage [data-f=found]') and pg.is_visible('#lvStage [data-act=next]'), '拼平角：再找到 45°＋45°＋90° → 2 種拼法過關')
 
     pg.click('button[data-level=l5]')
     pt = to_client(pg, '#lvStage svg', 320 + 230 * math.cos(math.radians(115)), 400 - 230 * math.sin(math.radians(115)))

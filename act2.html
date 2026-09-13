@@ -90,9 +90,171 @@
   var EXPLORE = [
     { id: 'e1', label: '測量三步驟（問1）', run: exSteps },
     { id: 'e2', label: '邊太短（問2）', run: exShort },
+    { id: 'e-att', label: '附件7 實測（問3）', run: exAttach },
     { id: 'e3', label: '奇奇和妙妙（動動腦）', run: exQiqi },
-    { id: 'e4', label: '平角（問7）', run: exStraight }
+    { id: 'e4', label: '平角（問7）', run: exStraight },
+    { id: 'e-draw', label: '畫角步驟（問9）', run: exDraw }
   ];
+
+  // 問3 印p36：附件7 實測。課本未印度數，網頁不判對錯；自己和同學記錄後比一比
+  function exAttach() {
+    exTitle.textContent = '拿出附件 7 的 4 個角，量量看，各是幾度？';
+    exText.textContent = '請用真的量角器量。附件上角的度數課本沒有印出來，網頁沒辦法幫你對答案。量完記在下面，再和同學比一比。';
+    var cap = AP.el('text', { x: 16, y: 34, 'font-size': 22, fill: '#00695c', 'font-weight': 700 }, exSvg);
+    cap.textContent = '附件 7：量角的三個步驟';
+    var prot = AP.drawProtractor(exSvg, { r: 190, style: 'L' });
+    AP.place(prot, 320, 300, 0);
+    STEP_TEXT.forEach(function (t, i) {
+      var tx = AP.el('text', { x: 24, y: 372 + i * 32, 'font-size': 18, fill: '#263238' }, exSvg);
+      tx.textContent = t;
+    });
+    var rows = [];
+    exCtrl.appendChild(h('div', { 'class': 'row' }, [
+      h('span', { text: '', style: 'min-width:48px' }),
+      h('span', { text: '我量到', style: 'min-width:96px;font-weight:700' }),
+      h('span', { text: '同學量到', style: 'font-weight:700' })
+    ]));
+    [1, 2, 3, 4].forEach(function (n) {
+      var me = h('input', { 'class': 'num', type: 'number', inputmode: 'numeric', 'data-f': 'me' + n });
+      var mate = h('input', { 'class': 'num', type: 'number', inputmode: 'numeric', 'data-f': 'mate' + n });
+      rows.push([n, me, mate]);
+      exCtrl.appendChild(h('div', { 'class': 'row' }, [h('span', { text: '∠' + n, style: 'min-width:48px;font-size:1.2rem' }), me, mate]));
+    });
+    exCtrl.appendChild(h('div', { 'class': 'row' }, [h('button', { 'class': 'btn primary', text: '比一比', 'data-act': 'compare', onclick: function () {
+      var ok = [], far = [], empty = [];
+      rows.forEach(function (r) {
+        var a = parseInt(r[1].value, 10), b = parseInt(r[2].value, 10);
+        if (isNaN(a) || isNaN(b)) { empty.push('∠' + r[0]); return; }
+        var d = Math.abs(a - b);
+        if (d <= 2) ok.push('∠' + r[0]); else far.push('∠' + r[0] + ' 差 ' + d + '°');
+      });
+      var parts = [];
+      if (ok.length) parts.push(ok.join('、') + ' 兩個人量的相差在 2° 以內。');
+      if (far.length) parts.push(far.join('、') + '，兩個人再一起量一次：中心點對齊頂點、刻度 0 的線對齊一邊，再數到另一邊。');
+      if (empty.length) parts.push(empty.join('、') + ' 還沒填完。');
+      UI.say(exMsg, parts.join(''), far.length ? 'bad' : 'ok');
+    } })]));
+  }
+
+  // 問9 印p40：畫指定角度的四個步驟（角度、方向、用哪一圈都隨機）
+  // 課本原文步驟②寫「直線對齊內圈刻度0」是配合課本圖的擺法；方向隨機時改說「對齊刻度 0 的線」並提示是哪一圈
+  var DRAW_TEXT = [
+    '① 先畫一條直線當作角的一邊，把線的一端當作角的頂點。',
+    '② 把量角器的中心點對準頂點，直線對齊刻度 0 的線。',
+    '③ 順著這一圈的刻度數，在要畫的度數的地方做一個記號。',
+    '④ 拿開量角器，將頂點和記號連成一直線，並標上弧線和度數。'
+  ];
+  function exDraw() {
+    exTitle.textContent = '要怎麼畫出指定度數的角？';
+    exText.textContent = '課本 問9 印p40 的四個步驟。按「換一個角度」，要畫的度數和方向都會不一樣。';
+    var R = 190, LEN = 215, V, t, b, side, rot, ring, newDir, st, prot, root, caption, baseLine, busy = false;
+
+    var list = h('ul', { style: 'list-style:none;padding:0;margin:8px 0' });
+    DRAW_TEXT.forEach(function () { list.appendChild(h('li', { style: 'padding:6px 10px;border-radius:10px;line-height:1.6;margin:2px 0' })); });
+    function setStep(n) {
+      Array.prototype.forEach.call(list.children, function (li, i) {
+        var k = i + 1;
+        li.style.fontWeight = k === n ? '700' : '400';
+        li.style.background = k === n ? '#e0f2f1' : 'transparent';
+        li.style.color = k < n ? '#2e7d32' : '#263238';
+        li.textContent = (k < n ? '✓ ' : '') + DRAW_TEXT[i];
+      });
+      var caps = ['步驟①　畫一條直線，一端是頂點', '步驟②　中心點對準頂點，直線對齊 0', '步驟③　數到 ' + t + ' 度，做記號', '步驟④　拿開量角器，連成一直線'];
+      caption.textContent = n >= 1 && n <= 4 ? caps[n - 1] : '畫好了！' + t + '° 的角';
+    }
+    function place() { AP.place(prot, st.cx, st.cy, st.rot); }
+    function run(fn) { if (busy) return; busy = true; fn(function () { busy = false; }); }
+    function moveTo(x, y, ms, done) {
+      var x0 = st.cx, y0 = st.cy;
+      animate(ms, function (k) { st.cx = x0 + (x - x0) * k; st.cy = y0 + (y - y0) * k; place(); }, done);
+    }
+    function rotTo(r, ms, done) {
+      var r0 = st.rot, d = ((r - r0) % 360 + 540) % 360 - 180;
+      animate(ms, function (k) { st.rot = r0 + d * k; place(); }, function () { st.rot = AP.norm360(r); place(); if (done) done(); });
+    }
+    function grow(line, dir, ms, done) {
+      animate(ms, function (k) {
+        var e = AP.pt(dir, LEN * k);
+        line.setAttribute('x2', V.x + e.x); line.setAttribute('y2', V.y + e.y);
+      }, done);
+    }
+
+    var d1 = h('button', { 'class': 'btn primary', text: '步驟①', 'data-act': 'draw1', onclick: function () {
+      run(function (done) {
+        d1.disabled = true; setStep(1);
+        UI.say(exMsg, DRAW_TEXT[0], 'ok');
+        AP.el('circle', { cx: V.x, cy: V.y, r: 5, fill: '#1e88e5' }, root);
+        grow(baseLine, b, 900, function () { d2.disabled = false; setStep(2); done(); });
+      });
+    } });
+    var d2 = h('button', { 'class': 'btn primary', text: '步驟②', 'data-act': 'draw2', disabled: 'disabled', onclick: function () {
+      run(function (done) {
+        d2.disabled = true;
+        UI.say(exMsg, DRAW_TEXT[1] + '這條直線壓在' + RING_NAME2[ring] + '的 0 上，等一下就順著這一圈數。', 'ok');
+        moveTo(V.x, V.y, 800, function () { rotTo(rot, 800, function () { d3.disabled = false; setStep(3); done(); }); });
+      });
+    } });
+    var d3 = h('button', { 'class': 'btn primary', text: '步驟③', 'data-act': 'draw3', disabled: 'disabled', onclick: function () {
+      run(function (done) {
+        d3.disabled = true;
+        var dot = AP.el('circle', { r: 6, fill: '#ef6c00' }, root);
+        animate(1300, function (k) {
+          var e = AP.pt(b + (newDir - b) * k, R + 10);
+          dot.setAttribute('cx', V.x + e.x); dot.setAttribute('cy', V.y + e.y);
+        }, function () {
+          dot.remove();
+          var m = AP.pt(newDir, R + 10);
+          AP.el('circle', { cx: V.x + m.x, cy: V.y + m.y, r: 7, fill: '#d32f2f', 'data-mark': '1' }, root);
+          AP.highlightLabel(prot, ring, side === 1 ? t : 180 - t);
+          UI.say(exMsg, '③ 順著' + RING_NAME2[ring] + '的刻度，從 0 數到 ' + t + '，在 ' + t + ' 度的地方做一個記號（紅點）。', 'ok');
+          d4.disabled = false; setStep(4); done();
+        });
+      });
+    } });
+    var d4 = h('button', { 'class': 'btn primary', text: '步驟④', 'data-act': 'draw4', disabled: 'disabled', onclick: function () {
+      run(function (done) {
+        d4.disabled = true;
+        // 移到畫面外，才看得出「拿開量角器」
+        moveTo(110, 760, 700, function () {
+          var line = AP.el('line', { x1: V.x, y1: V.y, x2: V.x, y2: V.y, 'class': 'ray2', 'data-drawn': '1' }, root);
+          grow(line, newDir, 800, function () {
+            AP.el('path', { d: AP.arcPath(b, newDir, 42), fill: 'none', stroke: '#d32f2f', 'stroke-width': 3, transform: 'translate(' + V.x + ' ' + V.y + ')' }, root);
+            var lp = AP.pt((b + newDir) / 2, 70);
+            var lab = AP.el('text', { x: V.x + lp.x, y: V.y + lp.y, 'font-size': 24, 'font-weight': 700, fill: '#d32f2f', 'text-anchor': 'middle', 'dominant-baseline': 'middle' }, root);
+            lab.textContent = t + '°';
+            UI.say(exMsg, DRAW_TEXT[3] + '這樣就畫好 ' + t + '° 的角了。接著在紙上用直尺和量角器畫出 70° 和 135° 的角（課本 做做看），課本容許 2 度以內的誤差。', 'ok');
+            setStep(5); done();
+          });
+        });
+      });
+    } });
+
+    function newAngle() {
+      if (busy) return;
+      AP.clear(exSvg); exSvg.setAttribute('viewBox', VB);
+      t = rint(2, 16) * 10;                     // 20°～160°，整十（刻度標示看得清楚）
+      b = rint(0, 359);                          // 直線方向隨機
+      side = Math.random() < 0.5 ? 1 : 2;        // 1：新邊在逆時針側（對齊量角器 θ=0 端）；2：順時針側（θ=180 端）
+      rot = side === 1 ? b : b - 180;
+      newDir = side === 1 ? b + t : b - t;
+      ring = C.ringReading(side === 1 ? 0 : 180, 'L', 'inner') === 0 ? 'inner' : 'outer';
+      V = { x: 320 + rint(-40, 40), y: 250 + rint(-15, 15) };
+      root = AP.el('g', { 'data-target': t }, exSvg);
+      baseLine = AP.el('line', { x1: V.x, y1: V.y, x2: V.x, y2: V.y, 'class': 'ray', 'data-base': '1' }, root);
+      prot = AP.drawProtractor(exSvg, { r: R, style: 'L' });
+      st = { cx: 110, cy: 460, rot: 0 };
+      place();
+      caption = AP.el('text', { x: 16, y: 34, 'font-size': 22, fill: '#00695c', 'font-weight': 700 }, exSvg);
+      d1.disabled = false; d2.disabled = true; d3.disabled = true; d4.disabled = true;
+      setStep(1);
+      UI.say(exMsg, '要畫 ' + t + '° 的角。按「步驟①」開始。');
+    }
+
+    exCtrl.appendChild(list);
+    exCtrl.appendChild(h('div', { 'class': 'row' }, [d1, d2, d3, d4]));
+    exCtrl.appendChild(h('div', { 'class': 'row' }, [h('button', { 'class': 'btn', text: '換一個角度', 'data-act': 'new-draw', onclick: newAngle })]));
+    newAngle();
+  }
   EXPLORE.forEach(function (e, i) {
     exNav.appendChild(h('button', { text: e.label, 'data-ex': e.id, onclick: function () { showExplore(i); } }));
   });
@@ -326,7 +488,6 @@
     { id: 'l1', label: '估一估（問5）', render: renderEstimate },
     { id: 'l2', label: '自己量（問1）', render: function (s, api) { renderMeasure(s, api, false); } },
     { id: 'l3', label: '邊太短（問2）', render: function (s, api) { renderMeasure(s, api, true); } },
-    { id: 'c3', label: '附件7（問3）', card: { id: 'act2-q3', src: '課本 問3 印p36', title: '拿出附件 7 的 4 個角，量量看，各是幾度？', text: '請用<b>真的量角器</b>量。附件上角的度數課本沒有印出來，網頁沒辦法幫你對答案，請和同學互相檢查。' } },
     { id: 'l4', label: '量法對嗎（動動腦）', render: renderJudge },
     // 問4 印p37：照課本圖顯示兩個三角板與 ∠1～∠6，一次亮一個角，學生實測後填答
     { id: 'l-sq', label: '三角板6個角（問4）', render: function renderSetSquares(stage, api) {
@@ -443,10 +604,290 @@
 
       showAngle();
     } },
-    { id: 'c6', label: '分類（問6）', card: { id: 'act2-q6', src: '課本 問6 印p38', title: '量量看課本上的 ∠1～∠6，記在表中，再分類。', text: '量課本紙上印的角，分成「等於 90° 的角」「小於 90° 的角」「大於 90° 的角」。說說看，哪些是直角、銳角、鈍角？' } },
-    { id: 'c8', label: '拼平角（問8）', card: { id: 'act2-q8', src: '課本 問8 印p39', title: '和同學合作，用三角板上的角拼出一個平角。', text: '說說看，你們是怎麼拼的？還有其他的拼法嗎？' } },
+    // 問6 印p38：量課本圖 ∠1～∠6 → 拖到「等於／小於／大於 90°」→ 做做看判斷
+    { id: 'l-cls', label: '量角再分類（問6）', render: function renderClassify(stage, api) {
+      var ui = layout(stage, '量角再分類（問6）', '課本 問6 印p38（附件6）', '');
+      var svg = ui.svg;
+      // 課本圖線段座標由 PDF 向量抽出（單位 pt）；度數由座標算出：
+      // ∠1 90.05、∠2 69.41、∠3 125.03、∠4 100.13、∠5 89.75、∠6 25.06（取整為標準答案）
+      var ANG = [
+        { n: 1, v: [125.1, 140.3],  e: [[76.6, 126.6], [137.6, 96.2]],  deg: 90,  color: '#f99d33' },
+        { n: 2, v: [253.75, 140.5], e: [[276.5, 96.6], [220.7, 103.8]], deg: 70,  color: '#f0668f' },
+        { n: 3, v: [123.1, 217.8],  e: [[151.7, 177.0], [73.7, 217.8]], deg: 125, color: '#7cb342' },
+        { n: 4, v: [249.75, 183.15], e: [[215.1, 216.8], [288.9, 211.8]], deg: 100, color: '#00a7e1' },
+        { n: 5, v: [114.9, 271.2],  e: [[74.8, 301.6], [142.4, 307.8]], deg: 90,  color: '#22b683' },
+        { n: 6, v: [217.7, 307.5],  e: [[282.6, 307.5], [276.5, 280.0]], deg: 25,  color: '#9679b7' }
+      ];
+      var S = 1.9, OX = 60, OY = 88;
+      function tx(p) { return [(p[0] - OX) * S, (p[1] - OY) * S]; }
+
+      var BINS = [
+        { key: 'eq', title: '等於 90° 的角', name: '直角', test: function (d) { return d === 90; }, y: 14 },
+        { key: 'lt', title: '小於 90° 的角', name: '銳角', test: function (d) { return d < 90; }, y: 166 },
+        { key: 'gt', title: '大於 90° 的角', name: '鈍角', test: function (d) { return d > 90; }, y: 318 }
+      ];
+      var binG = AP.el('g', { visibility: 'hidden' }, svg);
+      BINS.forEach(function (b) {
+        b.count = 0;
+        b.rect = AP.el('rect', { x: 452, y: b.y, width: 182, height: 146, rx: 12, fill: '#fffde7', stroke: '#f9a825', 'stroke-width': 2, 'data-bin': b.key, style: 'cursor:pointer' }, binG);
+        var t = AP.el('text', { x: 543, y: b.y + 24, 'font-size': 17, 'text-anchor': 'middle', fill: '#6d4c00', 'font-weight': 700, 'pointer-events': 'none' }, binG);
+        t.textContent = b.title;
+        b.nameText = AP.el('text', { x: 543, y: b.y + 136, 'font-size': 16, 'text-anchor': 'middle', fill: '#2e7d32', 'font-weight': 700, 'pointer-events': 'none' }, binG);
+      });
+
+      var items = ANG.map(function (a) {
+        var V = tx(a.v);
+        var g = AP.el('g', { 'data-angle': a.n, transform: 'translate(' + V[0] + ' ' + V[1] + ')' }, svg);
+        var ends = a.e.map(function (e) { var p = tx(e); return [p[0] - V[0], p[1] - V[1]]; });
+        var t1 = Math.atan2(-ends[0][1], ends[0][0]) * 180 / Math.PI;
+        var t2 = Math.atan2(-ends[1][1], ends[1][0]) * 180 / Math.PI;
+        var d = ((t2 - t1) % 360 + 360) % 360;
+        if (d > 180) { t1 = t2; d = 360 - d; } // 從較小的那一側逆時針掃過
+        AP.el('circle', { cx: 0, cy: 0, r: 70, fill: 'transparent' }, g);
+        var wedge = AP.wedge(g, 0, 0, t1, t1 + d, 34, 'wedge');
+        wedge.setAttribute('transform', ''); wedge.style.fill = 'transparent';
+        ends.forEach(function (p) {
+          AP.el('line', { x1: 0, y1: 0, x2: p[0], y2: p[1], stroke: a.color, 'stroke-width': 4, 'stroke-linecap': 'round' }, g);
+        });
+        AP.el('path', { d: AP.arcPath(t1, t1 + d, 18), fill: 'none', stroke: a.color, 'stroke-width': 2 }, g);
+        var lp = AP.pt(t1 + d / 2, 40);
+        var lab = AP.el('text', { x: lp.x, y: lp.y, 'font-size': 22, 'text-anchor': 'middle', 'dominant-baseline': 'middle', 'font-weight': 700, fill: '#263238' }, g);
+        lab.textContent = a.n;
+        var val = AP.el('text', { x: lp.x, y: lp.y + 24, 'font-size': 18, 'text-anchor': 'middle', 'dominant-baseline': 'middle', fill: '#2e7d32', 'font-weight': 700, 'data-val': a.n }, g);
+        return { a: a, g: g, V: V, wedge: wedge, lab: lab, val: val, placed: false };
+      });
+      function home(it) { it.g.setAttribute('transform', 'translate(' + it.V[0] + ' ' + it.V[1] + ')'); }
+
+      /* ---------- 第一段：一次量一個角 ---------- */
+      var phase = 'measure', idx = 0, wrong = 0, selected = null;
+      function paint() {
+        items.forEach(function (it, i) {
+          var cur = phase === 'measure' && i === idx, sel = phase === 'classify' && it === selected;
+          it.wedge.style.fill = cur ? 'rgba(255, 152, 0, .45)' : (sel ? 'rgba(30, 136, 229, .30)' : 'transparent');
+          it.lab.setAttribute('fill', cur ? '#e65100' : (sel ? '#0d47a1' : '#263238'));
+        });
+      }
+      ui.inputs.appendChild(h('p', { 'class': 'warn', text: '用真的量角器量課本 印p38 上印的角，量完再填。課本圖沒有印度數，答案是從課本圖的線條算出來的，容許 2° 誤差。網頁只能核對你填的數字。' }));
+      var which = h('span', { 'class': 'q' });
+      var inp = h('input', { 'class': 'num', type: 'number', inputmode: 'numeric', 'data-f': 'ans' });
+      ui.inputs.appendChild(h('div', { 'class': 'row' }, [which, inp, h('span', { text: '度' })]));
+      function showAngle() {
+        var a = items[idx].a;
+        wrong = 0; paint();
+        ui.q.textContent = '現在量 ∠' + a.n + '（第 ' + (idx + 1) + ' / 6 個角）';
+        which.textContent = '∠' + a.n + ' ＝';
+        inp.value = ''; check.disabled = false;
+        UI.say(ui.msg, '');
+      }
+      var check = h('button', { 'class': 'btn primary', text: '確定', 'data-act': 'check', onclick: function () {
+        var it = items[idx], a = it.a, v = parseInt(inp.value, 10);
+        if (isNaN(v)) { UI.say(ui.msg, '量完把度數填進來。', 'bad'); return; }
+        if (Math.abs(v - a.deg) <= 2) {
+          it.val.textContent = a.deg + '°';
+          UI.say(ui.msg, '對！∠' + a.n + ' 是 ' + a.deg + '°。', 'ok');
+          check.disabled = true;
+          idx++;
+          setTimeout(idx < items.length ? showAngle : startClassify, 700);
+          return;
+        }
+        wrong++;
+        var t = Math.abs(v - (180 - a.deg)) <= 2
+          ? '這個角比直角（90°）大還是小？再看看角的一邊壓在哪一圈的 0。'
+          : '再量一次：量角器的中心點對齊角的頂點，刻度 0 的線對齊角的一邊，再數到另一邊。';
+        if (wrong >= 3) t += '（角的邊太短時，可以把邊延長再量。）';
+        UI.say(ui.msg, t, 'bad');
+      } });
+      ui.btns.appendChild(check);
+      ui.btns.appendChild(h('button', { 'class': 'btn', text: '先跳過，課堂再做', 'data-act': 'skip', onclick: api.next }));
+
+      /* ---------- 第二段：拖到正確的格子 ---------- */
+      function tryPlace(it, bin) {
+        var a = it.a;
+        if (bin.test(a.deg)) {
+          var slot = bin.count++, K = 0.38;
+          // 以角的外框中心對準格子，避免超出格子或蓋到文字
+          var pts = [[0, 0]].concat(a.e.map(function (e) { var q = tx(e); return [q[0] - it.V[0], q[1] - it.V[1]]; }));
+          var xs = pts.map(function (q) { return q[0]; }), ys = pts.map(function (q) { return q[1]; });
+          var cx = (Math.min.apply(null, xs) + Math.max.apply(null, xs)) / 2, cy = (Math.min.apply(null, ys) + Math.max.apply(null, ys)) / 2;
+          var sx = 500 + slot * 86, sy = bin.y + 78;
+          it.g.setAttribute('transform', 'translate(' + (sx - cx * K) + ' ' + (sy - cy * K) + ') scale(' + K + ')');
+          it.placed = true; selected = null; paint();
+          bin.nameText.textContent = '這些角是' + bin.name;
+          UI.say(ui.msg, '對！∠' + a.n + ' 是 ' + a.deg + '°，' + bin.title.replace(' 的角', '') + '，是' + bin.name + '。', 'ok');
+          if (items.every(function (x) { return x.placed; })) setTimeout(startTrueFalse, 900);
+        } else {
+          home(it); selected = null; paint();
+          UI.say(ui.msg, '∠' + a.n + ' 是 ' + a.deg + '°。和 90° 比，是比 90° 大、比 90° 小，還是剛好 90°？再放一次。', 'bad');
+        }
+      }
+      function binAt(p) {
+        for (var i = 0; i < BINS.length; i++) {
+          var b = BINS[i];
+          if (p.x >= 452 && p.x <= 634 && p.y >= b.y && p.y <= b.y + 146) return b;
+        }
+        return null;
+      }
+      items.forEach(function (it) {
+        var st = null;
+        AP.drag(svg, it.g, {
+          start: function (p) { if (phase !== 'classify' || it.placed) { st = null; return; } st = { x: p.x, y: p.y, moved: false }; },
+          move: function (p) {
+            if (!st) return;
+            var dx = p.x - st.x, dy = p.y - st.y;
+            if (!st.moved && Math.abs(dx) + Math.abs(dy) < 6) return;
+            st.moved = true;
+            it.g.setAttribute('transform', 'translate(' + (it.V[0] + dx) + ' ' + (it.V[1] + dy) + ')');
+          },
+          end: function (p) {
+            if (!st) return;
+            if (!st.moved) { selected = selected === it ? null : it; paint(); if (selected) UI.say(ui.msg, '選了 ∠' + it.a.n + '，再點它要放的格子。'); st = null; return; }
+            var b = binAt(p);
+            if (b) tryPlace(it, b); else { home(it); }
+            st = null;
+          }
+        });
+      });
+      BINS.forEach(function (b) {
+        b.rect.addEventListener('click', function () { if (phase === 'classify' && selected) tryPlace(selected, b); });
+      });
+      function startClassify() {
+        phase = 'classify'; selected = null; paint();
+        binG.setAttribute('visibility', 'visible');
+        items.forEach(function (it) { it.g.style.cursor = 'grab'; });
+        ui.q.textContent = '6 個角都量好了！把角拖到正確的格子裡（也可以先點角，再點格子）。';
+        ui.inputs.innerHTML = ''; ui.btns.innerHTML = '';
+        UI.say(ui.msg, '');
+      }
+
+      /* ---------- 第三段：做做看（課本 印p38） ---------- */
+      function startTrueFalse() {
+        phase = 'tf';
+        ui.q.textContent = '分好了！銳角（0°＜銳角＜90°）、直角（＝90°）、鈍角（90°＜鈍角＜180°）。做做看：正確的選 ○，不正確的選 ×。';
+        ui.inputs.innerHTML = ''; ui.btns.innerHTML = ''; UI.say(ui.msg, '');
+        var TF = [
+          { id: 1, text: '① 比 90 度小的角稱為直角。', ok: 'x', right: '對！比 90° 小的角是銳角，剛好 90° 才是直角。', hint: '再想想：直角是幾度？' },
+          { id: 2, text: '② 有一個角是 95 度，它是鈍角。', ok: 'o', right: '對！95° 比 90° 大、比 180° 小，是鈍角。', hint: '再想想：95° 比 90° 大還是小？' }
+        ];
+        var done = {};
+        TF.forEach(function (q) {
+          var row = h('div', { 'class': 'row' }, [h('span', { 'class': 'q', text: q.text })]);
+          ['o', 'x'].forEach(function (c) {
+            row.appendChild(h('button', { 'class': 'btn', text: c === 'o' ? '○' : '×', 'data-tf': q.id + '-' + c, onclick: function () {
+              if (c === q.ok) {
+                done[q.id] = true;
+                UI.say(ui.msg, q.right, 'ok');
+                if (done[1] && done[2]) nextBtn(ui, true, api);
+              } else {
+                UI.say(ui.msg, q.hint, 'bad');
+              }
+            } }));
+          });
+          ui.inputs.appendChild(row);
+        });
+      }
+
+      showAngle();
+    } },
+    // 問8 印p39：自由移動三角板的角，試各種拼成平角的方法（找到 2 種不同拼法過關）
+    { id: 'l-flat', label: '拼平角（問8）', render: function renderFlat(stage, api) {
+      var ui = layout(stage, '拼平角（問8）', '課本 問8 印p39（附件6、8）',
+        '按按鈕放上三角板的角，拖動它們繞著頂點轉。把直線上面剛好拼滿、不重疊，就是平角。還有其他的拼法嗎？');
+      var svg = ui.svg, V = { x: 320, y: 380 }, RAD = 230;
+      AP.el('line', { x1: 30, y1: V.y, x2: 610, y2: V.y, stroke: '#90a4ae', 'stroke-width': 3, 'stroke-dasharray': '10 8' }, svg);
+      AP.el('path', { d: AP.arcPath(0, 180, RAD + 14), fill: 'none', stroke: '#cfd8dc', 'stroke-width': 2, 'stroke-dasharray': '6 6', transform: 'translate(' + V.x + ' ' + V.y + ')' }, svg);
+      var layer = AP.el('g', {}, svg);
+      AP.el('circle', { cx: V.x, cy: V.y, r: 6, fill: '#263238', 'pointer-events': 'none' }, svg);
+      var FILL = { 30: 'rgba(197, 225, 165, .9)', 45: 'rgba(165, 214, 167, .9)', 60: 'rgba(129, 199, 132, .9)', 90: 'rgba(102, 187, 106, .85)' };
+      var pieces = [], found = [], passed = false;
+
+      function norm(a) { return a > 270 ? a - 360 : a; } // 直線下方右側的角度當成負數，方便夾在 0～180
+      function snap(pc, s) {
+        var c = [0, 180 - pc.d];
+        pieces.forEach(function (q) { if (q !== pc) c.push(q.s + q.d, q.s - pc.d); });
+        var best = s, bd = 7;
+        c.forEach(function (v) { if (Math.abs(v - s) < bd) { bd = Math.abs(v - s); best = v; } });
+        return Math.max(0, Math.min(180 - pc.d, best));
+      }
+      function draw(pc) {
+        AP.setWedge(pc.w, pc.s, pc.s + pc.d, RAD);
+        var lp = AP.pt(pc.s + pc.d / 2, RAD * 0.62);
+        pc.t.setAttribute('x', V.x + lp.x); pc.t.setAttribute('y', V.y + lp.y);
+        pc.t.textContent = pc.d + '°';
+      }
+      var sumText = h('div', { 'class': 'q', 'data-f': 'sum' });
+      var foundBox = h('div', { 'class': 'q', 'data-f': 'found', text: '還沒有找到拼法。' });
+
+      function check() {
+        var arr = pieces.slice().sort(function (a, b) { return a.s - b.s; });
+        var overlap = arr.some(function (p, i) { return i > 0 && p.s < arr[i - 1].s + arr[i - 1].d; });
+        pieces.forEach(function (p) { p.w.style.stroke = overlap ? '#c62828' : '#33691e'; p.w.style.strokeWidth = overlap ? '4' : '2'; });
+        var total = arr.reduce(function (m, p) { return m + p.d; }, 0);
+        if (!arr.length) { sumText.textContent = '按上面的按鈕放一個角。'; return; }
+        var joined = arr.map(function (p) { return p.d + '°'; }).join('＋');
+        // 總和超過 180° 時一定放不下（必然重疊），先說「超過」比說「重疊」更能讓學生知道要拿走一個
+        if (total > 180) { sumText.textContent = joined + '＝' + total + '°，超過 180° 了，拿走一個角。'; return; }
+        if (overlap) { sumText.textContent = '有角疊在一起了。拼平角時，角要一個接一個排好，不可以重疊。'; return; }
+        var contiguous = arr[0].s === 0 && arr.every(function (p, i) { return i === 0 || p.s === arr[i - 1].s + arr[i - 1].d; });
+        if (contiguous && total === 180) {
+          var key = arr.map(function (p) { return p.d; }).sort(function (a, b) { return b - a; }).map(function (d) { return d + '°'; }).join('＋');
+          sumText.textContent = '拼成平角！' + joined + '＝180°';
+          if (found.indexOf(key) < 0) {
+            found.push(key);
+            foundBox.textContent = '找到的拼法（' + found.length + ' 種）：' + found.join('；');
+            UI.say(ui.msg, '拼成平角了！這是新的拼法：' + key + '＝180°。' + (found.length < 2 ? '按「全部清除」再找另一種拼法。' : ''), 'ok');
+          } else {
+            UI.say(ui.msg, '拼成平角了！不過這種拼法（' + key + '）已經找過了，換別的角試試看。', 'ok');
+          }
+          if (found.length >= 2 && !passed) {
+            passed = true;
+            UI.say(ui.msg, '你找到 ' + found.length + ' 種拼法了！還可以繼續找找看。', 'ok');
+            nextBtn(ui, true, api);
+          }
+          return;
+        }
+        sumText.textContent = '目前放了 ' + joined + '＝' + total + '°，拼滿平角還差 ' + (180 - total) + '°。' +
+          (contiguous ? '' : '角要從直線的一端開始，一個接一個排。');
+      }
+
+      function addPiece(d) {
+        if (pieces.length >= 6) { UI.say(ui.msg, '最多放 6 個角。', 'bad'); return; }
+        var end = pieces.reduce(function (m, p) { return Math.max(m, p.s + p.d); }, 0);
+        var g = AP.el('g', { 'data-piece': d, style: 'cursor:grab' }, layer);
+        var w = AP.wedge(g, V.x, V.y, 0, d, RAD, 'wedge');
+        w.style.fill = FILL[d];
+        var t = AP.el('text', { 'font-size': 22, 'font-weight': 700, 'text-anchor': 'middle', 'dominant-baseline': 'middle', fill: '#1b5e20', 'pointer-events': 'none' }, g);
+        var pc = { d: d, s: Math.min(end, 180 - d), g: g, w: w, t: t };
+        pieces.push(pc);
+        AP.drag(svg, g, {
+          start: function (p) { pc.grab = norm(AP.angleAt(V.x, V.y, p.x, p.y)) - pc.s; },
+          move: function (p) {
+            pc.s = snap(pc, Math.round(norm(AP.angleAt(V.x, V.y, p.x, p.y)) - pc.grab));
+            draw(pc); check();
+          }
+        });
+        draw(pc); check();
+      }
+
+      var palette = h('div', { 'class': 'row' }, [h('span', { text: '放一個角：' })]);
+      [30, 45, 60, 90].forEach(function (d) {
+        palette.appendChild(h('button', { 'class': 'btn', text: d + '°', 'data-add': d, onclick: function () { addPiece(d); } }));
+      });
+      ui.inputs.appendChild(palette);
+      ui.inputs.appendChild(h('div', { 'class': 'row' }, [
+        h('button', { 'class': 'btn', text: '拿走最後一個', 'data-act': 'remove-last', onclick: function () {
+          var pc = pieces.pop(); if (pc) pc.g.remove(); check();
+        } }),
+        h('button', { 'class': 'btn', text: '全部清除', 'data-act': 'clear-pieces', onclick: function () {
+          pieces.forEach(function (pc) { pc.g.remove(); }); pieces = []; check(); UI.say(ui.msg, '');
+        } })
+      ]));
+      ui.inputs.appendChild(sumText);
+      ui.inputs.appendChild(foundBox);
+      ui.inputs.appendChild(h('p', { 'class': 'src', text: '課本的例子：用 2 個直角拼成一個平角；先用 2 個 45° 角，還差 90°，要怎麼拼呢？課堂上請和同學用真的三角板拼一次。' }));
+      check();
+    } },
     { id: 'l5', label: '畫角做記號（問9）', render: renderMark },
-    { id: 'c9', label: '紙上畫角（做做看）', card: { id: 'act2-q9', src: '課本 問9 做做看 印p40；練習百分百（三）第1題 印p46', title: '用直尺和量角器在紙上畫出 70° 和 135° 的角。', text: '畫完和同學互相檢查。課本容許 2 度以內的誤差。<br>再量一量課本 印p46 練習百分百（三）第 1 題的三個角，是直角、銳角還是鈍角？' } }
+    { id: 'c-p46', label: '練習百分百第1題（p46）', card: { id: 'act2-p46-1', src: '練習百分百（三）第1題 印p46', title: '量一量課本 印p46 的三個角，各是幾度？是直角、銳角還是鈍角？', text: '用<b>真的量角器</b>量課本紙上印的角，量完和同學互相檢查。<br>在紙上畫 70° 和 135° 的角（課本 問9 做做看），請先看「探索」分頁的「畫角步驟」。' } }
   ];
   UI.levels(document.getElementById('lvNav'), document.getElementById('lvStage'), LEVELS, 'act2');
 
