@@ -103,37 +103,129 @@
     EXPLORE[i].run();
   }
 
-  // E1 問1 印p36
+  // E1 問1 印p36：隨機角度、隨機方向（無限換題），相同三步驟
+  // 步驟文字照課本 印p36；步驟②另加「角要包含在量角器裡面」與「只對齊一邊的兩種狀況」例子
+  var STEP_TEXT = [
+    '① 把量角器的中心點對齊角的頂點。',
+    '② 將刻度 0 的線，對齊角的一邊。角要包含在量角器裡面。',
+    '③ 從刻度 0 開始，數到角的另一邊為止。'
+  ];
+  var STEP_CAPTION = ['步驟①　中心點對齊頂點', '步驟②　0 的線對齊一邊，角在量角器裡面', '步驟③　從 0 數到另一邊'];
+  var RING_NAME2 = { inner: '紅字那一圈（內圈）', outer: '黑字那一圈（外圈）' };
+
   function exSteps() {
     exTitle.textContent = '要怎麼用量角器量出這個角是幾度？';
-    exText.textContent = '課本 問1 印p36 的三個步驟。一步一步按。';
-    var V = { x: 230, y: 340 }, base = 15, other = 85, R = 200;
-    var st = { cx: 480, cy: 450, rot: 0 };
-    var ang = AP.el('g', {}, exSvg);
-    drawEdge(ang, V, base, 320); drawEdge(ang, V, other, 320);
-    AP.wedge(ang, V.x, V.y, base, other, 40, 'wedge');
-    var prot = AP.drawProtractor(exSvg, { r: R, style: 'L' });
+    exText.textContent = '課本 問1 印p36 的三個步驟。按「換一個角」，角的大小和方向都會不一樣，一樣照三個步驟量。';
+    var R = 170, V, c, e1, e2, alignEdge, rotOK, ring, st, prot, caption, busy = false;
+
+    var stepBox = h('ul', { style: 'list-style:none;padding:0;margin:8px 0' });
+    STEP_TEXT.forEach(function () {
+      stepBox.appendChild(h('li', { style: 'padding:6px 10px;border-radius:10px;line-height:1.6;margin:2px 0' }));
+    });
+    function setStep(n) { // n：目前在第幾步（1～3）；4＝三步都完成
+      Array.prototype.forEach.call(stepBox.children, function (li, i) {
+        var k = i + 1;
+        li.style.fontWeight = k === n ? '700' : '400';
+        li.style.background = k === n ? '#e0f2f1' : 'transparent';
+        li.style.color = k < n ? '#2e7d32' : '#263238';
+        li.textContent = (k < n ? '✓ ' : '') + STEP_TEXT[i];
+      });
+      caption.textContent = n >= 1 && n <= 3 ? STEP_CAPTION[n - 1] : (n === 4 ? '量好了！' : '');
+    }
+
     function place() { AP.place(prot, st.cx, st.cy, st.rot); }
-    place();
-    var b1, b2, b3;
-    b1 = h('button', { 'class': 'btn primary', text: '步驟①', onclick: function () {
-      b1.disabled = true;
+    function run(fn) { if (busy) return false; busy = true; fn(function () { busy = false; }); return true; }
+    function moveTo(x, y, ms, done) {
       var x0 = st.cx, y0 = st.cy;
-      animate(900, function (k) { st.cx = x0 + (V.x - x0) * k; st.cy = y0 + (V.y - y0) * k; place(); }, function () { b2.disabled = false; });
-      UI.say(exMsg, '① 把量角器的中心點對齊角的頂點。', 'ok');
+      animate(ms, function (k) { st.cx = x0 + (x - x0) * k; st.cy = y0 + (y - y0) * k; place(); }, done);
+    }
+    function rotTo(r, ms, done) {
+      var r0 = st.rot, d = ((r - r0) % 360 + 540) % 360 - 180; // 走最短的方向轉
+      animate(ms, function (k) { st.rot = r0 + d * k; place(); }, function () { st.rot = AP.norm360(r); place(); if (done) done(); });
+    }
+    function clearLit() {
+      Array.prototype.forEach.call(prot.querySelectorAll('.pr-lit, [data-lit]'), function (n) { n.remove(); });
+    }
+
+    var b1 = h('button', { 'class': 'btn primary', text: '步驟①', 'data-act': 'step1', onclick: function () {
+      run(function (done) {
+        b1.disabled = true; setStep(1);
+        UI.say(exMsg, STEP_TEXT[0] + '量角器底邊中間的小黑點就是中心點。', 'ok');
+        moveTo(V.x, V.y, 900, function () { b2.disabled = false; setStep(2); done(); });
+      });
     } });
-    b2 = h('button', { 'class': 'btn primary', text: '步驟②', disabled: 'disabled', onclick: function () {
-      b2.disabled = true;
-      animate(900, function (k) { st.rot = base * k; place(); }, function () { b3.disabled = false; });
-      UI.say(exMsg, '② 將刻度 0 的線，對齊角的一邊。', 'ok');
+    var b2 = h('button', { 'class': 'btn primary', text: '步驟②', 'data-act': 'step2', disabled: 'disabled', onclick: function () {
+      run(function (done) {
+        b2.disabled = true;
+        UI.say(exMsg, STEP_TEXT[1] + '刻度 0 的線壓在角的一條邊上，而且整個角都被量角器蓋住。', 'ok');
+        rotTo(rotOK, 900, function () { b3.disabled = false; caseRow.hidden = false; done(); });
+      });
     } });
-    b3 = h('button', { 'class': 'btn primary', text: '步驟③', disabled: 'disabled', onclick: function () {
-      b3.disabled = true;
-      AP.highlightLabel(prot, 'inner', 0); AP.highlightLabel(prot, 'inner', other - base);
-      UI.say(exMsg, '③ 從刻度 0 開始，數到角的另一邊為止。這條邊壓在紅字那一圈的 0，數到 70，這個角是 70°。', 'ok');
+    var b3 = h('button', { 'class': 'btn primary', text: '步驟③', 'data-act': 'step3', disabled: 'disabled', onclick: function () {
+      run(function (done) {
+        b3.disabled = true; caseRow.hidden = true; clearLit(); setStep(3);
+        rotTo(rotOK, 400, function () {
+          var t0 = alignEdge === 1 ? 0 : 180, t1 = alignEdge === 1 ? c : 180 - c;
+          var w = AP.wedge(prot, 0, 0, Math.min(t0, t1), Math.max(t0, t1), R * 0.95, 'wedge');
+          w.setAttribute('transform', ''); w.setAttribute('data-lit', '1'); w.style.fill = 'rgba(255, 213, 79, .35)';
+          AP.highlightLabel(prot, ring, t0); AP.highlightLabel(prot, ring, t1);
+          UI.say(exMsg, STEP_TEXT[2] + '這條邊壓在' + RING_NAME2[ring] + '的 0，從 0 數到另一條邊是 ' + c + '，所以這個角是 ' + c + '°，是' + kind(c) + '。', 'ok');
+          setStep(4); done();
+        });
+      });
     } });
-    exCtrl.appendChild(h('div', { 'class': 'row' }, [b1, b2, b3,
-      h('button', { 'class': 'btn', text: '重來', onclick: function () { showExplore(0); } })]));
+
+    var bCase1 = h('button', { 'class': 'btn', text: '狀況一：角在量角器裡面', 'data-act': 'case-in', onclick: function () {
+      run(function (done) {
+        clearLit();
+        UI.say(exMsg, '狀況一：刻度 0 的線對齊角的一邊，量角器蓋住整個角，另一條邊碰得到刻度，可以讀出角度。✓ 這樣才對。', 'ok');
+        rotTo(rotOK, 700, done);
+      });
+    } });
+    var bCase2 = h('button', { 'class': 'btn', text: '狀況二：角在量角器外面', 'data-act': 'case-out', onclick: function () {
+      run(function (done) {
+        clearLit();
+        UI.say(exMsg, '狀況二：刻度 0 的線一樣對齊同一條邊，但量角器轉到另一邊，角沒有被蓋住，另一條邊碰不到刻度，讀不出角度。✗ 要把量角器轉回來，讓角包含在量角器裡面。', 'bad');
+        rotTo(rotOK + 180, 700, done);
+      });
+    } });
+    var caseRow = h('div', { hidden: 'hidden', 'data-row': 'cases' }, [
+      h('div', { 'class': 'q', text: '例子：刻度 0 的線只對齊角的一邊，會有兩種狀況：' }),
+      h('div', { 'class': 'row' }, [bCase1, bCase2])
+    ]);
+
+    function newAngle() {
+      if (busy) return;
+      AP.clear(exSvg); exSvg.setAttribute('viewBox', VB);
+      c = (2 + Math.floor(Math.random() * 15)) * 10;             // 20°～160°，整十（刻度標示看得清楚）
+      e1 = Math.floor(Math.random() * 360); e2 = e1 + c;          // 方向隨機
+      V = { x: 320 + Math.round(Math.random() * 60 - 30), y: 250 + Math.round(Math.random() * 40 - 20) };
+      // 隨機決定 0 的線對齊哪一條邊：對齊 e1 用量角器 θ=0 那端，對齊 e2 用 θ=180 那端
+      alignEdge = Math.random() < 0.5 ? 1 : 2;
+      rotOK = alignEdge === 1 ? AP.norm360(e1) : AP.norm360(e2 - 180);
+      ring = C.ringReading(alignEdge === 1 ? 0 : 180, 'L', 'inner') === 0 ? 'inner' : 'outer';
+
+      var ang = AP.el('g', {}, exSvg);
+      AP.wedge(ang, V.x, V.y, e1, e2, 36, 'wedge');
+      drawEdge(ang, V, e1, 215); drawEdge(ang, V, e2, 215);
+      AP.el('circle', { cx: V.x, cy: V.y, r: 5, fill: '#1e88e5' }, ang);
+      prot = AP.drawProtractor(exSvg, { r: R, style: 'L' });
+      st = { cx: 110, cy: 440, rot: 0 };
+      place();
+      caption = AP.el('text', { x: 16, y: 34, 'font-size': 22, fill: '#00695c', 'font-weight': 700 }, exSvg);
+
+      b1.disabled = false; b2.disabled = true; b3.disabled = true; caseRow.hidden = true;
+      setStep(1);
+      UI.say(exMsg, '按「步驟①」開始。');
+    }
+
+    exCtrl.appendChild(stepBox);
+    exCtrl.appendChild(h('div', { 'class': 'row' }, [b1, b2, b3]));
+    exCtrl.appendChild(caseRow);
+    exCtrl.appendChild(h('div', { 'class': 'row' }, [
+      h('button', { 'class': 'btn', text: '換一個角', 'data-act': 'new-angle', onclick: newAngle })
+    ]));
+    newAngle();
   }
 
   // E2 問2 印p36

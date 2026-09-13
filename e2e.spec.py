@@ -96,6 +96,29 @@ def run(pg):
     print('== act2.html')
     pg.goto(BASE + 'act2.html'); pg.wait_for_load_state('networkidle')
     no_mirror(pg, 'act2')
+
+    # 探索「測量三步驟」：隨機角度、三步驟、步驟②兩種狀況例子
+    pg.click('button[data-ex=e1]')
+    ck(not pg.is_visible('#exCtrl [data-row=cases]'), '三步驟：步驟②之前不顯示「兩種狀況」例子')
+    pg.click('#exCtrl [data-act=step1]'); pg.wait_for_timeout(1100)
+    ck(pg.is_enabled('#exCtrl [data-act=step2]') and '中心點' in pg.inner_text('#exMsg'), '三步驟：步驟①完成後可按步驟②')
+    pg.click('#exCtrl [data-act=step2]'); pg.wait_for_timeout(1100)
+    ck(pg.is_visible('#exCtrl [data-row=cases]') and '角要包含在量角器裡面' in pg.inner_text('#exCtrl'), '三步驟：步驟②說明「角要包含在量角器裡面」並出現兩種狀況')
+    pg.click('#exCtrl [data-act=case-out]'); pg.wait_for_timeout(900)
+    ck('角沒有被蓋住' in pg.inner_text('#exMsg'), '三步驟：狀況二說明角在量角器外面讀不出角度')
+    pg.click('#exCtrl [data-act=step3]'); pg.wait_for_timeout(700)
+    m3 = pg.inner_text('#exMsg')
+    ck('所以這個角是' in m3, '三步驟：步驟③讀出角度（狀況二會先轉回正確位置）')
+    deg1 = m3.split('所以這個角是 ')[1].split('°')[0] if '所以這個角是 ' in m3 else ''
+    edges_js = "[...document.querySelectorAll('#exSvg g line.ray')].map(l=>l.getAttribute('x2')+','+l.getAttribute('y2')).join(';')"
+    first = pg.evaluate(edges_js)
+    changed = False
+    for i in range(6):   # 隨機可能剛好抽到一樣的角，換 6 次至少要有一次不同
+        pg.click('#exCtrl [data-act=new-angle]'); pg.wait_for_timeout(100)
+        if pg.evaluate(edges_js) != first:
+            changed = True
+            break
+    ck(changed and pg.is_enabled('#exCtrl [data-act=step1]') and pg.is_disabled('#exCtrl [data-act=step3]'), '三步驟：「換一個角」出新角並重設步驟')
     pg.click('button[data-tab=practice]'); pg.click('button[data-level=l2]')
     ck(pg.is_disabled('#lvStage input[data-f=ans]'), '自己量：擺好前讀數格停用')
     ring_r = pg.evaluate('''()=>{const d=document.querySelector('#lvStage .ring-handle').getAttribute('d');return +d.split(' A ')[1].split(' ')[0];}''')
