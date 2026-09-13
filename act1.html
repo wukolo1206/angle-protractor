@@ -215,6 +215,7 @@
     var w = AP.wedge(s.sc, CX, CY, mid - 5, mid + 5, R, 'wedge');
     var l1 = AP.ray(s.sc, CX, CY, mid - 5, RAY, 'ray'), l2 = AP.ray(s.sc, CX, CY, mid + 5, RAY, 'ray');
     var hd = AP.el('circle', { r: 28, 'class': 'handle' }, exSvg);
+    var zoomed = false;
     function upd() {
       AP.setWedge(w, mid - 5, mid + 5, R);
       AP.setRay(l1, CX, CY, mid - 5, RAY); AP.setRay(l2, CX, CY, mid + 5, RAY);
@@ -222,8 +223,24 @@
       UI.say(exMsg, '兩條邊在外圈是 ' + C.ringReading(mid + 5, 'L', 'outer') + ' 和 ' + C.ringReading(mid - 5, 'L', 'outer') +
         '，張開的大小都是 10°。', 'ok');
     }
-    AP.drag(exSvg, hd, { move: function (p) { mid = Math.max(5, Math.min(175, dragTheta(p))); upd(); } });
+    // 放大鏡只在放開手後才移到新位置：拖曳中改 viewBox 會讓手指下的座標跟著變，角會亂跳
+    AP.drag(exSvg, hd, {
+      move: function (p) { mid = Math.max(5, Math.min(175, dragTheta(p))); upd(); },
+      end: function () { if (zoomed) zoomAt(exSvg, mid, 0.72); }
+    });
+    exCtrl.appendChild(h('div', { 'class': 'row' }, [
+      h('button', { 'class': 'btn', text: '放大看', 'data-act': 'zoom', onclick: function () {
+        zoomed = !zoomed;
+        if (zoomed) zoomAt(exSvg, mid, 0.72); else exSvg.setAttribute('viewBox', VB);
+      } })
+    ]));
     upd();
+  }
+
+  // 以角度 theta、半徑比例 k 的位置為中心放大（約 2 倍）
+  function zoomAt(svg, theta, k) {
+    var p = AP.pt(theta, R * k);
+    svg.setAttribute('viewBox', (CX + p.x - 160) + ' ' + (CY + p.y - 105) + ' 320 210');
   }
 
   // E4 問5–7 印p34–35
@@ -239,11 +256,20 @@
       lit = AP.el('g', {}, s.prot);
       h1 = AP.el('circle', { r: 26, 'class': 'handle' }, exSvg);
       h2 = AP.el('circle', { r: 26, 'class': 'handle' }, exSvg);
-      AP.drag(exSvg, h1, { move: function (p) { a = snapEdge(dragTheta(p)); upd(); } });
-      AP.drag(exSvg, h2, { move: function (p) { b = snapEdge(dragTheta(p)); upd(); } });
+      AP.drag(exSvg, h1, {
+        move: function (p) { a = snapEdge(dragTheta(p)); upd(); },
+        end: function () { focusT = a; if (zoomed) zoomAt(exSvg, focusT, 0.85); }
+      });
+      AP.drag(exSvg, h2, {
+        move: function (p) { b = snapEdge(dragTheta(p)); upd(); },
+        end: function () { focusT = b; if (zoomed) zoomAt(exSvg, focusT, 0.85); }
+      });
       upd();
+      if (zoomed) zoomAt(exSvg, focusT, 0.85); // drawScene 會重設 viewBox，重畫後補回放大
     }
     function snapEdge(t) { return t <= 2 ? 0 : (t >= 178 ? 180 : t); }
+    // 放大看：以最後拖動的那條邊為中心；放開手後才移動，避免拖曳中座標亂跳
+    var zoomed = false, focusT = b;
     function upd() {
       AP.setRay(l1, CX, CY, a, RAY); AP.setRay(l2, CX, CY, b, RAY);
       AP.setWedge(w, Math.min(a, b), Math.max(a, b), R * 0.35);
@@ -264,7 +290,11 @@
       UI.say(exMsg, text, 'ok');
     }
     exCtrl.appendChild(h('div', { 'class': 'row' }, [
-      h('button', { 'class': 'btn', text: '換一款量角器', 'data-act': 'style', onclick: function () { style = style === 'L' ? 'R' : 'L'; build(); } })
+      h('button', { 'class': 'btn', text: '換一款量角器', 'data-act': 'style', onclick: function () { style = style === 'L' ? 'R' : 'L'; build(); } }),
+      h('button', { 'class': 'btn', text: '放大看', 'data-act': 'zoom', onclick: function () {
+        zoomed = !zoomed;
+        if (zoomed) zoomAt(exSvg, focusT, 0.85); else exSvg.setAttribute('viewBox', VB);
+      } })
     ]));
     build();
   }
