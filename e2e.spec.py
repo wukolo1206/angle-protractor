@@ -169,6 +169,27 @@ def run(pg):
     pg.click('button[data-level=l4]')
     ck(not pg.is_visible('#lvStage [data-reason]'), '量法對嗎：選「不正確」之前不顯示原因按鈕（hidden 不可被 .row 蓋掉）')
 
+    # 問4 三角板 6 個角：一次量一個、實測後填答
+    pg.click('button[data-level=l-sq]')
+    ck('現在量 ∠1' in pg.inner_text('#lvStage .q'), '三角板：一次亮一個角，從 ∠1 開始')
+    pg.fill('#lvStage input[data-f=ans]', '150'); pg.click('#lvStage [data-act=check]')
+    ck('比直角（90°）大還是小' in msg(pg), '三角板：∠1 填 150 → 讀錯圈提示')
+    for n, d in [(1, 31), (2, 60), (3, 90), (4, 45), (5, 89), (6, 45)]:
+        pg.wait_for_selector('#lvStage [data-act=check]:not([disabled])')
+        ck(('現在量 ∠%d' % n) in pg.inner_text('#lvStage .q'), '三角板：輪到 ∠%d' % n)
+        pg.fill('#lvStage input[data-f=ans]', str(d)); pg.click('#lvStage [data-act=check]')
+        pg.wait_for_timeout(850)
+    ck('都量好了' in pg.inner_text('#lvStage .q'), '三角板：6 個角量完（31、89 在 2° 誤差內算對）進入兩個小題')
+    vals = pg.eval_on_selector_all('#lvStage svg [data-val]', 'e=>e.map(x=>x.textContent)')
+    ck(vals == ['30°', '60°', '90°', '45°', '90°', '45°'], '三角板：答案方框填入課本標準值')
+    pg.fill('#lvStage input[data-f=q1]', '90')
+    pg.click('#lvStage [data-pick="4"]'); pg.click('#lvStage [data-pick="2"]')
+    pg.fill('#lvStage input[data-f=q2]', '45'); pg.click('#lvStage [data-act=check2]')
+    ck('哪兩個一樣' in msg(pg), '三角板②：選 ∠4、∠2 → 提示')
+    pg.click('#lvStage [data-pick="2"]'); pg.click('#lvStage [data-pick="6"]')
+    pg.click('#lvStage [data-act=check2]')
+    ck('都是 45°' in msg(pg), '三角板②：選 ∠4、∠6、45 度 → 答對')
+
     pg.click('button[data-level=l5]')
     pt = to_client(pg, '#lvStage svg', 320 + 230 * math.cos(math.radians(115)), 400 - 230 * math.sin(math.radians(115)))
     pg.mouse.click(pt[0], pt[1])

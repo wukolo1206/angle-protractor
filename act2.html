@@ -328,7 +328,121 @@
     { id: 'l3', label: '邊太短（問2）', render: function (s, api) { renderMeasure(s, api, true); } },
     { id: 'c3', label: '附件7（問3）', card: { id: 'act2-q3', src: '課本 問3 印p36', title: '拿出附件 7 的 4 個角，量量看，各是幾度？', text: '請用<b>真的量角器</b>量。附件上角的度數課本沒有印出來，網頁沒辦法幫你對答案，請和同學互相檢查。' } },
     { id: 'l4', label: '量法對嗎（動動腦）', render: renderJudge },
-    { id: 'c4', label: '三角板（問4）', card: { id: 'act2-q4', src: '課本 問4 印p37', title: '拿出兩個三角板，它們共有 6 個角，量量看，各是幾度？', text: '用真的量角器量三角板的角。∠3 和 ∠5 都是直角，是幾度？還有哪兩個角一樣大？' } },
+    // 問4 印p37：照課本圖顯示兩個三角板與 ∠1～∠6，一次亮一個角，學生實測後填答
+    { id: 'l-sq', label: '三角板6個角（問4）', render: function renderSetSquares(stage, api) {
+      var ui = layout(stage, '三角板 6 個角（問4）', '課本 問4 印p37（附件6、8）', '');
+      var svg = ui.svg;
+      // 課本圖（220dpi 核對）：左 30-60-90、右 45-45-90
+      // x,y＝頂點；a1→a2＝角的兩邊方向（數學角，逆時針）；deg＝標準答案；bx,by＝答案方框中心
+      var ANG = [
+        { n: 1, x: 90,  y: 170, a1: -30, a2: 0,   deg: 30, bx: 48,  by: 150 },
+        { n: 2, x: 310, y: 297, a1: 90,  a2: 150, deg: 60, bx: 330, by: 332 },
+        { n: 3, x: 310, y: 170, a1: 180, a2: 270, deg: 90, bx: 352, by: 140 },
+        { n: 4, x: 390, y: 380, a1: 0,   a2: 45,  deg: 45, bx: 350, by: 414 },
+        { n: 5, x: 550, y: 380, a1: 90,  a2: 180, deg: 90, bx: 596, by: 414 },
+        { n: 6, x: 550, y: 220, a1: 225, a2: 270, deg: 45, bx: 596, by: 196 }
+      ];
+      function tri(pts) {
+        AP.el('polygon', { points: pts.map(function (p) { return p.join(','); }).join(' '), fill: '#c5e1a5', stroke: '#7cb342', 'stroke-width': 2 }, svg);
+      }
+      tri([[90, 170], [310, 170], [310, 297]]);
+      tri([[390, 380], [550, 380], [550, 220]]);
+      var marks = ANG.map(function (a) {
+        var g = AP.el('g', { 'data-angle': a.n }, svg);
+        var wedge = AP.wedge(g, a.x, a.y, a.a1, a.a2, 36, 'wedge');
+        wedge.style.fill = 'transparent';
+        var arc = AP.el('path', { d: AP.arcPath(a.a1, a.a2, 22), fill: 'none', stroke: '#e53935', 'stroke-width': 3, transform: 'translate(' + a.x + ' ' + a.y + ')' }, g);
+        var lp = AP.pt((a.a1 + a.a2) / 2, 46);
+        var lab = AP.el('text', { x: a.x + lp.x, y: a.y + lp.y, 'font-size': 22, 'text-anchor': 'middle', 'dominant-baseline': 'middle', fill: '#263238', 'font-weight': 700 }, g);
+        lab.textContent = a.n;
+        AP.el('rect', { x: a.bx - 32, y: a.by - 17, width: 64, height: 34, rx: 4, fill: '#fff', stroke: '#90a4ae', 'stroke-width': 1.5 }, g);
+        var val = AP.el('text', { x: a.bx, y: a.by, 'font-size': 20, 'text-anchor': 'middle', 'dominant-baseline': 'middle', fill: '#2e7d32', 'font-weight': 700, 'data-val': a.n }, g);
+        return { wedge: wedge, arc: arc, lab: lab, val: val };
+      });
+
+      var idx = 0, wrong = 0;
+      function paint() {
+        marks.forEach(function (m, i) {
+          var cur = i === idx, done = i < idx;
+          m.wedge.style.fill = cur ? 'rgba(255, 152, 0, .45)' : 'transparent';
+          m.arc.setAttribute('stroke', cur ? '#ef6c00' : (done ? '#2e7d32' : '#e53935'));
+          m.arc.setAttribute('stroke-width', cur ? 5 : 3);
+          m.lab.setAttribute('fill', cur ? '#e65100' : '#263238');
+        });
+      }
+
+      ui.inputs.appendChild(h('p', { 'class': 'warn', text: '拿出附件 8 的兩個三角板，用真的量角器量，量完再填。網頁只能核對你填的數字，沒辦法知道你有沒有真的量。' }));
+      var which = h('span', { 'class': 'q' });
+      var inp = h('input', { 'class': 'num', type: 'number', inputmode: 'numeric', 'data-f': 'ans' });
+      ui.inputs.appendChild(h('div', { 'class': 'row' }, [which, inp, h('span', { text: '度' })]));
+
+      function showAngle() {
+        var a = ANG[idx];
+        wrong = 0; paint();
+        ui.q.textContent = '現在量 ∠' + a.n + '（第 ' + (idx + 1) + ' / 6 個角）';
+        which.textContent = '∠' + a.n + ' ＝';
+        inp.value = ''; check.disabled = false;
+        UI.say(ui.msg, '');
+      }
+      var check = h('button', { 'class': 'btn primary', text: '確定', 'data-act': 'check', onclick: function () {
+        var a = ANG[idx], v = parseInt(inp.value, 10);
+        if (isNaN(v)) { UI.say(ui.msg, '量完把度數填進來。', 'bad'); return; }
+        if (Math.abs(v - a.deg) <= 2) { // 實測容許 2° 誤差
+          marks[idx].val.textContent = a.deg + '°';
+          UI.say(ui.msg, '對！∠' + a.n + ' 是 ' + a.deg + '°。', 'ok');
+          check.disabled = true;
+          idx++;
+          if (idx < ANG.length) setTimeout(showAngle, 700);
+          else { paint(); setTimeout(finishPart, 700); }
+          return;
+        }
+        wrong++;
+        var t = Math.abs(v - (180 - a.deg)) <= 2
+          ? '這個角比直角（90°）大還是小？再看看角的一邊壓在哪一圈的 0。'
+          : '再量一次：量角器的中心點對齊角的頂點，刻度 0 的線對齊角的一邊，再數到另一邊。';
+        if (wrong >= 3) t += '（三角板的角只有 30°、45°、60°、90° 這幾種。）';
+        UI.say(ui.msg, t, 'bad');
+      } });
+      ui.btns.appendChild(check);
+      ui.btns.appendChild(h('button', { 'class': 'btn', text: '先跳過，課堂再做', 'data-act': 'skip', onclick: api.next }));
+
+      function finishPart() {
+        ui.q.textContent = '6 個角都量好了！回答課本的兩個問題。';
+        ui.inputs.innerHTML = ''; ui.btns.innerHTML = ''; UI.say(ui.msg, '');
+        var q1 = h('input', { 'class': 'num', type: 'number', inputmode: 'numeric', 'data-f': 'q1' });
+        var q2 = h('input', { 'class': 'num', type: 'number', inputmode: 'numeric', 'data-f': 'q2' });
+        var pick = [];
+        var pickRow = h('div', { 'class': 'row' });
+        [1, 2, 4, 6].forEach(function (n) {
+          var b = h('button', { 'class': 'btn', text: '∠' + n, 'data-pick': n, onclick: function () {
+            var k = pick.indexOf(n);
+            if (k >= 0) { pick.splice(k, 1); b.classList.remove('sel'); return; }
+            if (pick.length === 2) {
+              var drop = pick.shift();
+              pickRow.querySelector('[data-pick="' + drop + '"]').classList.remove('sel');
+            }
+            pick.push(n); b.classList.add('sel');
+          } });
+          pickRow.appendChild(b);
+        });
+        ui.inputs.appendChild(h('div', { 'class': 'q', text: '① ∠3 和 ∠5 都是直角，它們都是幾度？' }));
+        ui.inputs.appendChild(h('div', { 'class': 'row' }, [q1, h('span', { text: '度' })]));
+        ui.inputs.appendChild(h('div', { 'class': 'q', text: '② 除了 ∠3 和 ∠5，還有哪兩個角一樣大？是多少度？' }));
+        ui.inputs.appendChild(pickRow);
+        ui.inputs.appendChild(h('div', { 'class': 'row' }, [h('span', { text: '都是' }), q2, h('span', { text: '度' })]));
+        ui.btns.appendChild(h('button', { 'class': 'btn primary', text: '確定', 'data-act': 'check2', onclick: function () {
+          var msgs = [];
+          if (parseInt(q1.value, 10) !== 90) msgs.push('①：直角是幾度？');
+          if (pick.slice().sort().join(',') !== '4,6') msgs.push('②：看看你量出來的數字，哪兩個一樣？');
+          else if (parseInt(q2.value, 10) !== 45) msgs.push('②：這兩個角是幾度？');
+          if (msgs.length) { UI.say(ui.msg, msgs.join(''), 'bad'); return; }
+          UI.say(ui.msg, '答對了！∠3 和 ∠5 都是 90°；∠4 和 ∠6 一樣大，都是 45°。', 'ok');
+          nextBtn(ui, true, api);
+        } }));
+      }
+
+      showAngle();
+    } },
     { id: 'c6', label: '分類（問6）', card: { id: 'act2-q6', src: '課本 問6 印p38', title: '量量看課本上的 ∠1～∠6，記在表中，再分類。', text: '量課本紙上印的角，分成「等於 90° 的角」「小於 90° 的角」「大於 90° 的角」。說說看，哪些是直角、銳角、鈍角？' } },
     { id: 'c8', label: '拼平角（問8）', card: { id: 'act2-q8', src: '課本 問8 印p39', title: '和同學合作，用三角板上的角拼出一個平角。', text: '說說看，你們是怎麼拼的？還有其他的拼法嗎？' } },
     { id: 'l5', label: '畫角做記號（問9）', render: renderMark },
