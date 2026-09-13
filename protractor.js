@@ -207,7 +207,44 @@
     };
   }
 
+  /* 放大時拖空白處移動畫面
+   * - 只在 viewBox 不等於 baseVB（放大中）時作用
+   * - 按在把手、圓環、可點的格子上不移動畫面，讓原本的拖曳照常
+   * - 移動超過 4px 才算拖曳；拖曳後吃掉那一次 click，避免誤點
+   * - 以按下當時的 viewBox 為基準計算，拖曳中改 viewBox 不會累積誤差 */
+  function pan(svg, baseVB) {
+    var st = null, moved = false;
+    var base = baseVB.split(/\s+/).map(Number);
+    function vbNow() { return svg.getAttribute('viewBox').split(/\s+/).map(Number); }
+    svg.addEventListener('pointerdown', function (e) {
+      if (svg.getAttribute('viewBox') === baseVB) return;
+      if (e.target.closest && e.target.closest('.handle, .ring-handle, [data-seg], [data-hit], [data-num]')) return;
+      var v = vbNow();
+      st = { x: e.clientX, y: e.clientY, v: v, k: v[2] / svg.getBoundingClientRect().width };
+      moved = false;
+      try { svg.setPointerCapture(e.pointerId); } catch (err) { /* 不支援就算了 */ }
+    });
+    svg.addEventListener('pointermove', function (e) {
+      if (!st) return;
+      var dx = (e.clientX - st.x) * st.k, dy = (e.clientY - st.y) * st.k;
+      if (!moved && Math.abs(dx) + Math.abs(dy) < 4 * st.k) return;
+      moved = true;
+      e.preventDefault();
+      var w = st.v[2], hgt = st.v[3];
+      var nx = Math.max(base[0] - w / 2, Math.min(base[0] + base[2] - w / 2, st.v[0] - dx));
+      var ny = Math.max(base[1] - hgt / 2, Math.min(base[1] + base[3] - hgt / 2, st.v[1] - dy));
+      svg.setAttribute('viewBox', nx + ' ' + ny + ' ' + w + ' ' + hgt);
+    });
+    function end() { st = null; }
+    svg.addEventListener('pointerup', end);
+    svg.addEventListener('pointercancel', end);
+    svg.addEventListener('click', function (e) {
+      if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; }
+    }, true);
+  }
+
   root.AP = {
+    pan: pan,
     el: el, clear: clear, pt: pt, angleAt: angleAt, norm360: norm360,
     arcPath: arcPath, wedgePath: wedgePath, place: place,
     drawProtractor: drawProtractor, highlightLabel: highlightLabel,

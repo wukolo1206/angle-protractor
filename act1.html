@@ -103,6 +103,7 @@
   var exTitle = document.getElementById('exTitle'), exText = document.getElementById('exText');
   var exCtrl = document.getElementById('exCtrl'), exMsg = document.getElementById('exMsg');
   var exNav = document.getElementById('exNav');
+  AP.pan(exSvg, VB); // 放大時拖空白處移動畫面
 
   var EXPLORE = [
     { id: 'e0', label: '比直角大還是小', run: exRightAngle },
@@ -357,6 +358,7 @@
     var idx = 0, item, wrong = 0, zoomed = false;
 
     var svg = AP.el('svg', { viewBox: VB });
+    AP.pan(svg, VB); // 放大看時拖空白處移動畫面
     var board = h('div', { 'class': 'board' }); board.appendChild(svg);
     var prog = h('div', { 'class': 'src' });
     var qtext = h('div', { 'class': 'q', text: lv.q });
