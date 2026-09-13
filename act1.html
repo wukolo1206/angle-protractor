@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>活動一　量角器的認識與報讀</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>活動一　量角器的認識與報讀</h1>
+    <span class="src">課本 印 p31–35（開門活動＋活動一）</span>
+    <a class="home" href="index.html">← 回首頁</a>
+  </header>
+
+  <div class="tabs">
+    <button data-tab="explore">🔍 探索</button>
+    <button data-tab="practice">✏️ 練習</button>
+    <button data-tab="challenge">🏆 挑戰</button>
+  </div>
+
+  <section data-panel="explore">
+    <div class="physical">網頁練完，課堂要用真的量角器再量一次。</div>
+    <div class="levels" id="exNav"></div>
+    <div class="stage">
+      <div class="board"><svg id="exSvg" viewBox="0 0 640 390"></svg></div>
+      <div class="side">
+        <h2 id="exTitle"></h2>
+        <div class="q" id="exText"></div>
+        <div id="exCtrl"></div>
+        <div class="msg" id="exMsg"></div>
+      </div>
+    </div>
+  </section>
+
+  <section data-panel="practice">
+    <div class="levels" id="lvNav"></div>
+    <div id="lvStage"></div>
+  </section>
+
+  <section data-panel="challenge">
+    <p class="warn">學力檢測考古題，使用原題圖。</p>
+    <div id="chBox"></div>
+  </section>
+</div>
+
+<script src="angle-core.js"></script>
+<script src="protractor.js"></script>
+<script src="ui.js"></script>
+<script>
+(function () {
+  'use strict';
+  var C = window.AngleCore, h = UI.h;
+  var VB = '0 0 640 390', CX = 320, CY = 345, R = 285, RAY = R + 30;
+
+  /* ---------- 回饋語（UI 層） ---------- */
+  var MSG = {
+    CORRECT: '答對了！',
+    WRONG_RING: '這個角比直角（90°）大還是小？再看看角的一邊壓在哪一圈的 0。',
+    ONE_EDGE: '這是其中一條邊的刻度。兩條邊都不在 0 上，要從一條邊數到另一條邊。',
+    NEAR_MISS: '差一點點，按「放大看」，一小格一小格數。',
+    AMBIGUOUS: '再檢查一次：是不是只讀了一條邊的刻度？也按「放大看」一小格一小格數。',
+    OTHER: '從 0 開始，一大格一大格數到另一條邊。'
+  };
+  var MSG_SCALE = {
+    CROSS_RING: '兩個刻度要讀同一圈。',
+    SAME_EDGE: '這兩個數是同一條邊在兩圈的刻度，要分別讀兩條邊。',
+    NOT_EDGE: '有一個數字不在角的邊上，再看一次邊壓在哪條刻度線。'
+  };
+  var MSG_DIFF = {
+    SUB_ERROR: '兩個刻度都讀對了，再算一次相減。',
+    FOLLOWS_WRONG_READING: '減法算對了，問題在前面讀的刻度。',
+    OTHER: '再算一次相減。'
+  };
+
+  var RING_NAME = { outer: '黑字那一圈（外圈）', inner: '紅字那一圈（內圈）' };
+
+  function clamp180(t) { return Math.max(0, Math.min(180, t)); }
+  function dragTheta(p) {
+    if (p.y > CY) return p.x < CX ? 180 : 0;
+    return clamp180(Math.round(AP.angleAt(CX, CY, p.x, p.y)));
+  }
+  // θ 在底線上時，哪一圈的 0 在這裡
+  function zeroRingAt(theta, style) {
+    if (theta !== 0 && theta !== 180) return null;
+    return C.ringReading(theta, style, 'inner') === 0 ? 'inner' : 'outer';
+  }
+
+  function drawScene(svg, style) {
+    AP.clear(svg);
+    svg.setAttribute('viewBox', VB);
+    var sc = AP.el('g', { id: svg.id + '-scene' }, svg);
+    var prot = AP.drawProtractor(sc, { r: R, style: style });
+    AP.place(prot, CX, CY, 0);
+    return { sc: sc, prot: prot };
+  }
+
+  /* ================================================================
+   * 🔍 探索
+   * ============================================================== */
+  var exSvg = document.getElementById('exSvg');
+  var exTitle = document.getElementById('exTitle'), exText = document.getElementById('exText');
+  var exCtrl = document.getElementById('exCtrl'), exMsg = document.getElementById('exMsg');
+  var exNav = document.getElementById('exNav');
+
+  var EXPLORE = [
+    { id: 'e0', label: '比直角大還是小', run: exRightAngle },
+    { id: 'e1', label: '認識量角器', run: exKnow },
+    { id: 'e2', label: '1° 與 10°', run: exDegree },
+    { id: 'e3', label: '位置不同一樣大', run: exSame },
+    { id: 'e4', label: '報讀自由探索', run: exFree }
+  ];
+  EXPLORE.forEach(function (e, i) {
+    exNav.appendChild(h('button', { text: e.label, 'data-ex': e.id, onclick: function () { showExplore(i); } }));
+  });
+  function showExplore(i) {
+    Array.prototype.forEach.call(exNav.children, function (b, j) { b.classList.toggle('on', i === j); });
+    AP.clear(exSvg); exSvg.setAttribute('viewBox', VB);
+    exCtrl.innerHTML = ''; UI.say(exMsg, '');
+    EXPLORE[i].run();
+  }
+
+  // E0 開門活動 印p31
+  function exRightAngle() {
+    exTitle.textContent = '哪一個角比直角大？';
+    exText.textContent = '課本開門活動用三角板的直角來比。點一個角，把直角疊上去比比看。';
+    var angles = [{ name: '甲', deg: 60, x: 90 }, { name: '乙', deg: 90, x: 300 }, { name: '丙', deg: 125, x: 510 }];
+    var y = 300, L = 150;
+    angles.forEach(function (a) {
+      var g = AP.el('g', { 'data-angle': a.name, style: 'cursor:pointer' }, exSvg);
+      AP.el('rect', { x: a.x - 90, y: 80, width: 200, height: 260, fill: 'transparent' }, g);
+      AP.ray(g, a.x, y, 0, L, 'ray');
+      AP.ray(g, a.x, y, a.deg, L, 'ray');
+      AP.wedge(g, a.x, y, 0, a.deg, 36, 'wedge');
+      var t = AP.el('text', { x: a.x + 10, y: y + 34, 'font-size': 26 }, g);
+      t.textContent = a.name;
+      g.addEventListener('click', function () {
+        Array.prototype.forEach.call(exSvg.querySelectorAll('.sq'), function (n) { n.remove(); });
+        AP.el('path', { d: 'M ' + a.x + ' ' + y + ' L ' + (a.x + 110) + ' ' + y + ' L ' + a.x + ' ' + (y - 110) + ' Z',
+          fill: 'rgba(255,193,7,.35)', stroke: '#f9a825', 'stroke-width': 2, 'class': 'sq' }, exSvg);
+        var s = a.deg < 90 ? '比直角小' : (a.deg === 90 ? '和直角一樣大' : '比直角大');
+        UI.say(exMsg, a.name + '：' + s + '。', 'ok');
+      });
+    });
+  }
+
+  // E1 問1 印p32
+  function exKnow() {
+    exTitle.textContent = '說說看，你看到什麼？';
+    exText.textContent = '點下面的按鈕，找找看量角器上的東西。（課本 問1 印 p32）';
+    var s = drawScene(exSvg, 'L');
+    var marks = AP.el('g', {}, exSvg);
+    var items = [
+      ['中心點', function () {
+        AP.el('circle', { cx: CX, cy: CY, r: 14, fill: 'none', stroke: '#f9a825', 'stroke-width': 4 }, marks);
+        return '這裡是量角器的中心點。';
+      }],
+      ['刻度 0 的線', function () {
+        AP.el('line', { x1: CX - R, y1: CY, x2: CX + R, y2: CY, stroke: '#f9a825', 'stroke-width': 6, opacity: .8 }, marks);
+        return '這條線通過中心點，兩端是兩圈刻度的 0。';
+      }],
+      ['外圈（黑字）', function () {
+        for (var t = 0; t <= 180; t += 10) AP.highlightLabel(s.prot, 'outer', t);
+        return '外圈從左到右，有 0、10、20、……到 180 的數字。';
+      }],
+      ['內圈（紅字）', function () {
+        for (var t = 0; t <= 180; t += 10) AP.highlightLabel(s.prot, 'inner', t);
+        return '內圈從右到左，也有 0、10、20、……到 180 的數字。';
+      }]
+    ];
+    var row = h('div', { 'class': 'row' });
+    items.forEach(function (it) {
+      row.appendChild(h('button', { 'class': 'btn', text: it[0], onclick: function () {
+        AP.clear(marks);
+        Array.prototype.forEach.call(s.prot.querySelectorAll('.pr-lit'), function (n) { n.remove(); });
+        UI.say(exMsg, it[1](), 'ok');
+      } }));
+    });
+    exCtrl.appendChild(row);
+  }
+
+  // E2 問2–3 印p33
+  function exDegree() {
+    exTitle.textContent = '每一小格是幾度？';
+    exText.textContent = '拖動藍色的邊，看看張開幾小格。量角器上每一小格所對的角都是 1 度，記成「1°」。';
+    var s = drawScene(exSvg, 'L');
+    var theta = 3;
+    var w = AP.wedge(s.sc, CX, CY, 0, theta, R, 'wedge');
+    AP.ray(s.sc, CX, CY, 0, RAY, 'ray');
+    var line = AP.ray(s.sc, CX, CY, theta, RAY, 'ray');
+    var hd = AP.el('circle', { r: 26, 'class': 'handle' }, exSvg);
+    var zoomed = false;
+    function upd() {
+      AP.setWedge(w, 0, theta, R); AP.setRay(line, CX, CY, theta, RAY);
+      var p = AP.pt(theta, RAY); hd.setAttribute('cx', CX + p.x); hd.setAttribute('cy', CY + p.y);
+      UI.say(exMsg, '張開 ' + theta + ' 小格，是 ' + theta + '°' + (theta % 10 === 0 ? '（' + theta / 10 + ' 大格）' : ''), 'ok');
+    }
+    AP.drag(exSvg, hd, { move: function (p) { theta = Math.max(1, dragTheta(p)); upd(); } });
+    exCtrl.appendChild(h('div', { 'class': 'row' }, [
+      h('button', { 'class': 'btn', text: '放大看', onclick: function () {
+        zoomed = !zoomed;
+        exSvg.setAttribute('viewBox', zoomed ? (CX + R - 200) + ' ' + (CY - 150) + ' 260 170' : VB);
+      } })
+    ]));
+    upd();
+  }
+
+  // E3 問4 印p33
+  function exSame() {
+    exTitle.textContent = '三個角都一樣大嗎？';
+    exText.textContent = '拖動這個角到不同的位置。兩條邊的刻度一直在變，張開的大小呢？（課本 問4 印 p33）';
+    var s = drawScene(exSvg, 'L');
+    var mid = 45;
+    var w = AP.wedge(s.sc, CX, CY, mid - 5, mid + 5, R, 'wedge');
+    var l1 = AP.ray(s.sc, CX, CY, mid - 5, RAY, 'ray'), l2 = AP.ray(s.sc, CX, CY, mid + 5, RAY, 'ray');
+    var hd = AP.el('circle', { r: 28, 'class': 'handle' }, exSvg);
+    function upd() {
+      AP.setWedge(w, mid - 5, mid + 5, R);
+      AP.setRay(l1, CX, CY, mid - 5, RAY); AP.setRay(l2, CX, CY, mid + 5, RAY);
+      var p = AP.pt(mid, R * 0.5); hd.setAttribute('cx', CX + p.x); hd.setAttribute('cy', CY + p.y);
+      UI.say(exMsg, '兩條邊在外圈是 ' + C.ringReading(mid + 5, 'L', 'outer') + ' 和 ' + C.ringReading(mid - 5, 'L', 'outer') +
+        '，張開的大小都是 10°。', 'ok');
+    }
+    AP.drag(exSvg, hd, { move: function (p) { mid = Math.max(5, Math.min(175, dragTheta(p))); upd(); } });
+    upd();
+  }
+
+  // E4 問5–7 印p34–35
+  function exFree() {
+    exTitle.textContent = '報讀自由探索';
+    exText.textContent = '拖動兩條邊。當一條邊壓在某一圈的 0，就看那一圈的數字。';
+    var style = 'L', a = 0, b = 50;
+    var s, w, l1, l2, h1, h2, lit;
+    function build() {
+      s = drawScene(exSvg, style);
+      w = AP.wedge(s.sc, CX, CY, 0, 50, R * 0.35, 'wedge');
+      l1 = AP.ray(s.sc, CX, CY, a, RAY, 'ray'); l2 = AP.ray(s.sc, CX, CY, b, RAY, 'ray2');
+      lit = AP.el('g', {}, s.prot);
+      h1 = AP.el('circle', { r: 26, 'class': 'handle' }, exSvg);
+      h2 = AP.el('circle', { r: 26, 'class': 'handle' }, exSvg);
+      AP.drag(exSvg, h1, { move: function (p) { a = snapEdge(dragTheta(p)); upd(); } });
+      AP.drag(exSvg, h2, { move: function (p) { b = snapEdge(dragTheta(p)); upd(); } });
+      upd();
+    }
+    function snapEdge(t) { return t <= 2 ? 0 : (t >= 178 ? 180 : t); }
+    function upd() {
+      AP.setRay(l1, CX, CY, a, RAY); AP.setRay(l2, CX, CY, b, RAY);
+      AP.setWedge(w, Math.min(a, b), Math.max(a, b), R * 0.35);
+      [[h1, a], [h2, b]].forEach(function (x) { var p = AP.pt(x[1], RAY); x[0].setAttribute('cx', CX + p.x); x[0].setAttribute('cy', CY + p.y); });
+      Array.prototype.forEach.call(s.prot.querySelectorAll('.pr-lit'), function (n) { n.remove(); });
+      var c = Math.abs(a - b), text;
+      var zr = zeroRingAt(a, style) || zeroRingAt(b, style);
+      if (zr && c > 0 && c < 180) {
+        var other = zeroRingAt(a, style) ? b : a, start = other === b ? a : b;
+        AP.highlightLabel(s.prot, zr, start);
+        if (other % 10 === 0) AP.highlightLabel(s.prot, zr, other);
+        text = '一條邊壓在' + RING_NAME[zr] + '的 0，就看這一圈：另一條邊在 ' + C.ringReading(other, style, zr) + '。這個角是 ' + c + '°。';
+      } else {
+        text = '藍邊：黑字 ' + C.ringReading(a, style, 'outer') + '、紅字 ' + C.ringReading(a, style, 'inner') +
+          '；橘邊：黑字 ' + C.ringReading(b, style, 'outer') + '、紅字 ' + C.ringReading(b, style, 'inner') +
+          '。兩條邊都不在 0 上，這個角是 ' + c + '°。';
+      }
+      UI.say(exMsg, text, 'ok');
+    }
+    exCtrl.appendChild(h('div', { 'class': 'row' }, [
+      h('button', { 'class': 'btn', text: '換一款量角器', 'data-act': 'style', onclick: function () { style = style === 'L' ? 'R' : 'L'; build(); } })
+    ]));
+    build();
+  }
+
+  /* ================================================================
+   * ✏️ 練習
+   * ============================================================== */
+  function rngInt(lo, hi, step) { var n = Math.floor((hi - lo) / step) + 1; return lo + step * Math.floor(Math.random() * n); }
+  function zeroItem(start, step, style) {
+    var c;
+    do { c = rngInt(step, 180 - step, step); } while (!C.isReadingItemUsable({ rays: [0, c] }));
+    return { rays: start === 0 ? [0, c] : [180, 180 - c], style: style };
+  }
+  var RANDOM_N = 5;
+
+  var LEVELS = [
+    { id: 'l1', label: '1 小格（問2–3）', mode: 'single', smallZoom: true,
+      q: '下圖中的角是幾度？（量角器把半圓平分成 180 小格）',
+      book: [{ rays: [0, 2], style: 'L', src: '課本 問3 印p33' }, { rays: [0, 3], style: 'L', src: '課本 問3 印p33' }],
+      rand: function () { return { rays: [0, rngInt(1, 9, 1)], style: 'L' }; } },
+    { id: 'l2', label: '一樣大嗎（問4）', mode: 'same' },
+    { id: 'l3', label: '內圈 0 起（問5①）', mode: 'single',
+      q: '角的頂點在量角器的中心點，一邊對齊刻度 0 的線。這個角是幾度？',
+      book: [{ rays: [0, 50], style: 'L', src: '課本 問5① 印p34' }],
+      rand: function () { return zeroItem(0, 10, 'L'); } },
+    { id: 'l4', label: '外圈 0 起（問5②）', mode: 'single',
+      q: '角的頂點在量角器的中心點，一邊對齊刻度 0 的線。這個角是幾度？',
+      book: [{ rays: [180, 135], style: 'L', src: '課本 問5② 印p34' }],
+      rand: function () { return zeroItem(180, 5, 'L'); } },
+    { id: 'l5', label: '做做看（p34）', mode: 'single', q: '填填看，下圖中的角是幾度？',
+      book: [{ rays: [180, 100], style: 'L', src: '課本 做做看① 印p34' }, { rays: [0, 65], style: 'L', src: '課本 做做看② 印p34' }],
+      rand: function () { return C.makeReadingItem('zero', 5, 'L'); } },
+    { id: 'l6', label: '40 還是 140（問6）', mode: 'single', q: '下圖中的角是 40 度，還是 140 度？填出度數。',
+      book: [{ rays: [180, 40], style: 'L', src: '課本 問6 印p35' }],
+      rand: function () { return C.makeReadingItem('zero', 5, 'random'); },
+      note: '接下來的題目會出現另一款量角器（0 在另一邊），一樣先找角的一邊壓在哪一圈的 0。' },
+    { id: 'l7', label: '一格一格數（問7）', mode: 'count',
+      q: '兩條邊都不在 0°線上。從一條邊開始，一大格一大格點到另一條邊。',
+      book: [{ rays: [130, 60], style: 'L', src: '課本 問7 印p35' }],
+      rand: function () { return C.makeReadingItem('nonzero', 10, 'L'); } },
+    { id: 'l8', label: '用相減（做做看 p35）', mode: 'sub',
+      q: '讀出兩條邊在同一圈的刻度，用大刻度減小刻度。',
+      book: [{ rays: [110, 45], style: 'L', src: '課本 做做看① 印p35' }, { rays: [120, 20], style: 'L', src: '課本 做做看② 印p35' }],
+      rand: function () {
+        var a, b;
+        do { a = rngInt(5, 175, 5); b = rngInt(5, 175, 5); } while (Math.abs(a - b) < 15);
+        return { rays: [a, b], style: Math.random() < 0.5 ? 'L' : 'R' };
+      } }
+  ];
+
+  UI.levels(document.getElementById('lvNav'), document.getElementById('lvStage'),
+    LEVELS.map(function (lv) { return { id: lv.id, label: lv.label, render: function (st, api) { renderLevel(lv, st, api); } }; }),
+    'act1');
+
+  function renderLevel(lv, stage, api) {
+    if (lv.mode === 'same') return renderSame(stage, api);
+
+    var queue = lv.book.slice();
+    for (var i = 0; i < RANDOM_N; i++) queue.push(null);
+    var idx = 0, item, wrong = 0, zoomed = false;
+
+    var svg = AP.el('svg', { viewBox: VB });
+    var board = h('div', { 'class': 'board' }); board.appendChild(svg);
+    var prog = h('div', { 'class': 'src' });
+    var qtext = h('div', { 'class': 'q', text: lv.q });
+    var inputs = h('div');
+    var msg = h('div', { 'class': 'msg' });
+    var btns = h('div', { 'class': 'row' });
+    var side = h('div', { 'class': 'side' }, [h('h2', { text: lv.label }), prog, qtext, lv.note ? h('p', { 'class': 'warn', text: lv.note }) : null, inputs, btns, msg]);
+    stage.appendChild(h('div', { 'class': 'stage' }, [board, side]));
+
+    function load() {
+      item = queue[idx] || lv.rand();
+      wrong = 0; zoomed = false;
+      prog.textContent = '第 ' + (idx + 1) + ' / ' + queue.length + ' 題　' + (queue[idx] ? queue[idx].src : '再練一題');
+      var s = drawScene(svg, item.style);
+      var lo = Math.min(item.rays[0], item.rays[1]), hi = Math.max(item.rays[0], item.rays[1]);
+      AP.wedge(s.sc, CX, CY, lo, hi, R * 0.3, 'wedge');
+      item.rays.forEach(function (t) { AP.ray(s.sc, CX, CY, t, RAY, 'ray'); });
+      item.prot = s.prot; item.sc = s.sc;
+      inputs.innerHTML = ''; btns.innerHTML = ''; UI.say(msg, '');
+      if (lv.mode === 'single') buildSingle();
+      else if (lv.mode === 'count') buildCount(lo, hi);
+      else buildSub();
+    }
+
+    function zoomBtn() {
+      return h('button', { 'class': 'btn', text: '放大看', 'data-act': 'zoom', onclick: function () {
+        zoomed = !zoomed;
+        var t = item.rays[0] === 0 || item.rays[0] === 180 ? item.rays[1] : item.rays[0];
+        var p = AP.pt(t, R * 0.82);
+        svg.setAttribute('viewBox', zoomed ? (CX + p.x - 130) + ' ' + (CY + p.y - 85) + ' 260 170' : VB);
+      } });
+    }
+
+    function answerBtn() {
+      return h('button', { 'class': 'btn', text: '看答案', 'data-act': 'answer', onclick: function () {
+        var zr = zeroRingAt(item.rays[0], item.style) || zeroRingAt(item.rays[1], item.style);
+        var rings = zr ? [zr] : ['outer', 'inner'];
+        rings.forEach(function (rg) { item.rays.forEach(function (t) { AP.highlightLabel(item.prot, rg, t); }); });
+        UI.say(msg, '答案是 ' + C.correctAngle(item.rays) + '°。', '');
+      } });
+    }
+
+    function onCorrect() {
+      UI.say(msg, MSG.CORRECT, 'ok');
+      btns.innerHTML = '';
+      var last = idx === queue.length - 1;
+      if (last) api.pass();
+      btns.appendChild(h('button', { 'class': 'btn primary', 'data-act': 'next', text: last ? '這一關完成！下一關' : '下一題', onclick: function () {
+        if (last) api.next(); else { idx++; load(); }
+      } }));
+    }
+
+    function onWrong(text) {
+      wrong++;
+      UI.say(msg, text, 'bad');
+      if (wrong === 3 && !btns.querySelector('[data-act=answer]')) btns.appendChild(answerBtn());
+    }
+
+    function buildSingle() {
+      var inp = h('input', { 'class': 'num', type: 'number', inputmode: 'numeric', 'data-f': 'ans' });
+      inputs.appendChild(h('div', { 'class': 'row' }, [inp, h('span', { text: '度' })]));
+      btns.appendChild(h('button', { 'class': 'btn primary', text: '確定', 'data-act': 'check', onclick: function () {
+        var v = parseInt(inp.value, 10);
+        if (isNaN(v)) { UI.say(msg, '先填一個數字。', 'bad'); return; }
+        var code = C.diagnoseReadingSingle({ answer: v, rays: item.rays, style: item.style }).code;
+        if (code === 'CORRECT') onCorrect(); else onWrong(MSG[code]);
+      } }));
+      btns.appendChild(zoomBtn());
+    }
+
+    function buildCount(lo, hi) {
+      var n = Math.round((hi - lo) / 10), lit = [], side = null;
+      var inp = h('input', { 'class': 'num', type: 'number', inputmode: 'numeric', 'data-f': 'ans', disabled: 'disabled' });
+      var counter = h('span', { 'class': 'q', text: '已點 0 格' });
+      inputs.appendChild(h('div', { 'class': 'row' }, [counter]));
+      inputs.appendChild(h('div', { 'class': 'row' }, [inp, h('span', { text: '度' })]));
+      var segG = AP.el('g', {}, item.sc);
+      for (var k = 0; k < n; k++) (function (k) {
+        var seg = AP.wedge(segG, CX, CY, lo + 10 * k, lo + 10 * (k + 1), R, 'wedge');
+        seg.setAttribute('fill', 'rgba(0,0,0,0.02)');
+        seg.setAttribute('data-seg', k);
+        seg.style.cursor = 'pointer';
+        seg.addEventListener('click', function () {
+          if (lit.indexOf(k) >= 0) return;
+          var expect;
+          if (lit.length === 0) {
+            if (k === 0) side = 'lo'; else if (k === n - 1) side = 'hi';
+            else { UI.say(msg, '從一條邊旁邊的那一格開始點。', 'bad'); return; }
+            expect = k;
+          } else {
+            expect = side === 'lo' ? lit.length : n - 1 - lit.length;
+          }
+          if (k !== expect) { UI.say(msg, '一格一格往另一條邊點，不要跳格。', 'bad'); return; }
+          lit.push(k);
+          seg.setAttribute('fill', 'rgba(30,136,229,.30)');
+          var p = AP.pt(lo + 10 * k + 5, R + 22);
+          var tx = AP.el('text', { x: CX + p.x, y: CY + p.y, 'font-size': 18, 'text-anchor': 'middle', fill: '#0d47a1', 'font-weight': 700 }, segG);
+          tx.textContent = (lit.length * 10) + '°';
+          counter.textContent = '已點 ' + lit.length + ' 格';
+          UI.say(msg, '');
+          if (lit.length === n) {
+            inp.removeAttribute('disabled');
+            UI.say(msg, '點完了！一共是幾度？', '');
+          }
+        });
+      })(k);
+      btns.appendChild(h('button', { 'class': 'btn primary', text: '確定', 'data-act': 'check', onclick: function () {
+        if (lit.length < n) { UI.say(msg, '先一格一格點到另一條邊。', 'bad'); return; }
+        var v = parseInt(inp.value, 10);
+        if (isNaN(v)) { UI.say(msg, '先填一個數字。', 'bad'); return; }
+        var code = C.diagnoseReadingSingle({ answer: v, rays: item.rays, style: item.style }).code;
+        if (code === 'CORRECT') onCorrect(); else onWrong(MSG[code]);
+      } }));
+    }
+
+    function buildSub() {
+      var big = h('input', { 'class': 'num', type: 'number', inputmode: 'numeric', 'data-f': 'big' });
+      var small = h('input', { 'class': 'num', type: 'number', inputmode: 'numeric', 'data-f': 'small' });
+      var diff = h('input', { 'class': 'num', type: 'number', inputmode: 'numeric', 'data-f': 'diff' });
+      inputs.appendChild(h('div', { 'class': 'row' }, [big, h('span', { text: '－' }), small, h('span', { text: '＝' }), diff, h('span', { text: '度' })]));
+      btns.appendChild(h('button', { 'class': 'btn primary', text: '確定', 'data-act': 'check', onclick: function () {
+        var v = [big, small, diff].map(function (x) { return parseInt(x.value, 10); });
+        if (v.some(isNaN)) { UI.say(msg, '三格都要填。', 'bad'); return; }
+        var r = C.diagnoseReadingSubtraction({ big: v[0], small: v[1], diff: v[2], rays: item.rays, style: item.style });
+        [big, small].forEach(function (x) { x.classList.toggle('okf', r.scale === 'CORRECT'); x.classList.toggle('badf', r.scale !== 'CORRECT'); });
+        diff.classList.toggle('okf', r.diff === 'CORRECT'); diff.classList.toggle('badf', r.diff !== 'CORRECT');
+        if (r.scale === 'CORRECT' && r.diff === 'CORRECT') { onCorrect(); return; }
+        onWrong(r.scale !== 'CORRECT' ? MSG_SCALE[r.scale] + (r.diff === 'FOLLOWS_WRONG_READING' ? MSG_DIFF.FOLLOWS_WRONG_READING : '') : MSG_DIFF[r.diff]);
+      } }));
+      btns.appendChild(zoomBtn());
+    }
+
+    load();
+  }
+
+  // 關 2：問4 印p33 三個位置不同的 10° 角
+  function renderSame(stage, api) {
+    var svg = AP.el('svg', { viewBox: VB });
+    var board = h('div', { 'class': 'board' }); board.appendChild(svg);
+    var msg = h('div', { 'class': 'msg' });
+    var choice = null;
+    var inp = h('input', { 'class': 'num', type: 'number', inputmode: 'numeric', 'data-f': 'ans' });
+    var bSame = h('button', { 'class': 'btn', text: '一樣大', 'data-act': 'same', onclick: function () { choice = 'same'; bSame.classList.add('sel'); bDiff.classList.remove('sel'); } });
+    var bDiff = h('button', { 'class': 'btn', text: '不一樣大', 'data-act': 'diff', onclick: function () { choice = 'diff'; bDiff.classList.add('sel'); bSame.classList.remove('sel'); } });
+    var btns = h('div', { 'class': 'row' });
+    var side = h('div', { 'class': 'side' }, [
+      h('h2', { text: '一樣大嗎（問4）' }), h('div', { 'class': 'src', text: '課本 問4 印p33' }),
+      h('div', { 'class': 'q', text: '每一大格都平分成 10 小格，下圖畫出來的三個角都一樣大嗎？是幾度？' }),
+      h('div', { 'class': 'row' }, [bSame, bDiff]), h('div', { 'class': 'row' }, [inp, h('span', { text: '度' })]), btns, msg]);
+    stage.appendChild(h('div', { 'class': 'stage' }, [board, side]));
+    var s = drawScene(svg, 'L');
+    [[10, 20], [80, 90], [150, 160]].forEach(function (p) {
+      AP.wedge(s.sc, CX, CY, p[0], p[1], R, 'wedge');
+      AP.ray(s.sc, CX, CY, p[0], RAY, 'ray'); AP.ray(s.sc, CX, CY, p[1], RAY, 'ray');
+    });
+    btns.appendChild(h('button', { 'class': 'btn primary', text: '確定', 'data-act': 'check', onclick: function () {
+      var v = parseInt(inp.value, 10);
+      if (choice === 'diff') { UI.say(msg, '看每個角張開幾小格。位置不同，張開的格數呢？', 'bad'); return; }
+      if (choice !== 'same') { UI.say(msg, '先選一樣大或不一樣大。', 'bad'); return; }
+      if (v !== 10) { UI.say(msg, '一大格是幾小格？每一小格是 1°。', 'bad'); return; }
+      UI.say(msg, '對！一樣大，都是 10°。角的大小看張開多少，不看擺在哪裡。', 'ok');
+      api.pass();
+      btns.innerHTML = '';
+      btns.appendChild(h('button', { 'class': 'btn primary', 'data-act': 'next', text: '這一關完成！下一關', onclick: api.next }));
+    } }));
+  }
+
+  /* ================================================================
+   * 🏆 挑戰
+   * ============================================================== */
+  var CHALLENGE = [
+    { id: '109-15', img: 'img/109_4_q15.png', answer: 2,
+      why: '一條邊在 90，另一條邊在黑字那一圈的 40。兩條邊都不在 0 上：90－40＝50。選項④說「沒對齊 0 無法測量」不對，兩邊都不在 0 也能用相減量。' },
+    { id: '110-2', img: 'img/110_4_q2.png', answer: 3,
+      why: '兩條邊都不在 0 上：在黑字那一圈是 20 和 150，150－20＝130。20、30、150 都只看了其中一條邊。' },
+    { id: '112-8', img: 'img/112_4_q8.png', answer: 2,
+      why: '角 A 的兩條邊在紅字那一圈是 40 和 110，110－40＝70。40 和 110 都只看了一條邊。' },
+    { id: '108-4', img: 'img/108_4_q4.png', answer: 3, scope: '三年級內容（角的意義），老師可自行決定是否跳過。',
+      why: '角要有一個頂點和兩條直直的邊。甲有一條邊是彎的；乙轉彎的地方是圓的，沒有尖尖的頂點；丁的兩條邊沒有接在一起。只有丙是角。' }
+  ];
+  var chBox = document.getElementById('chBox');
+  CHALLENGE.forEach(function (q) {
+    var msg = h('div', { 'class': 'msg' });
+    var row = h('div', { 'class': 'row' });
+    [1, 2, 3, 4].forEach(function (n) {
+      row.appendChild(h('button', { 'class': 'btn', text: '①②③④'.charAt(n - 1), 'data-opt': n, onclick: function () {
+        if (n === q.answer) UI.say(msg, '答對了！' + q.why, 'ok');
+        else UI.say(msg, '再想想看。', 'bad');
+      } }));
+    });
+    chBox.appendChild(h('div', { 'class': 'side', style: 'margin-bottom:16px', 'data-q': q.id }, [
+      h('h2', { text: q.id + ' 學力檢測' }),
+      q.scope ? h('p', { 'class': 'warn', text: q.scope }) : null,
+      h('img', { src: q.img, alt: q.id + ' 原題', style: 'max-width:100%' }),
+      row, msg]));
+  });
+
+  UI.tabs();
+  showExplore(4);
+})();
+</script>
+</body>
+</html>
