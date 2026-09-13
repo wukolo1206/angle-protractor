@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>活動二　測量角的大小和畫角</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>活動二　測量角的大小和畫角</h1>
+    <span class="src">課本 印 p36–40</span>
+    <a class="home" href="index.html">← 回首頁</a>
+  </header>
+
+  <div class="tabs">
+    <button data-tab="explore">🔍 探索</button>
+    <button data-tab="practice">✏️ 練習</button>
+    <button data-tab="challenge">🏆 挑戰</button>
+  </div>
+
+  <section data-panel="explore">
+    <div class="physical">網頁練完，課堂要用真的量角器再量一次。網頁上擺得好，不代表真的量角器也會擺。</div>
+    <div class="levels" id="exNav"></div>
+    <div class="stage">
+      <div class="board"><svg id="exSvg" viewBox="0 0 640 480"></svg></div>
+      <div class="side">
+        <h2 id="exTitle"></h2>
+        <div class="q" id="exText"></div>
+        <div id="exCtrl"></div>
+        <div class="msg" id="exMsg"></div>
+      </div>
+    </div>
+  </section>
+
+  <section data-panel="practice">
+    <div class="levels" id="lvNav"></div>
+    <div id="lvStage"></div>
+  </section>
+
+  <section data-panel="challenge">
+    <p class="warn">擺法判斷挑戰：題型改寫自習作 印p32 第 1 題，擺法由系統產生，<b>不是原題</b>。</p>
+    <div id="chBox"></div>
+  </section>
+</div>
+
+<script src="angle-core.js"></script>
+<script src="protractor.js"></script>
+<script src="ui.js"></script>
+<script>
+(function () {
+  'use strict';
+  var C = window.AngleCore, h = UI.h;
+  var VB = '0 0 640 480';
+
+  var MSG = {
+    CORRECT: '答對了！',
+    WRONG_RING: '這個角比直角（90°）大還是小？再看看角的一邊壓在哪一圈的 0。',
+    NEAR_MISS: '差一點點，一小格一小格數。',
+    AMBIGUOUS: '再數一次，從 0 開始數到另一條邊。',
+    OTHER: '從刻度 0 開始，數到角的另一邊為止。',
+    CENTER_OFF: '量角器的中心點還沒對到角的頂點。',
+    ZERO_LINE_OFF: '刻度 0 的線還沒壓在角的一條邊上。轉動外面的圓環，或按 ◀1°、1°▶。',
+    ANGLE_OUTSIDE: '0 線對到邊了，但角沒有被量角器蓋住。量角器要蓋在角的裡面，轉過來試試。',
+    SHORT: '0 線對好了，可是角的邊太短，看不到刻度。把邊拉長一點。'
+  };
+
+  function rint(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
+  function kind(c) { return c < 90 ? '銳角' : (c === 90 ? '直角' : '鈍角'); }
+  function animate(ms, step, done) {
+    var t0 = null;
+    function f(t) { if (t0 === null) t0 = t; var k = Math.min(1, (t - t0) / ms); step(k); if (k < 1) requestAnimationFrame(f); else if (done) done(); }
+    requestAnimationFrame(f);
+  }
+  function endPoint(V, dir, len) { var p = AP.pt(dir, len); return { x: V.x + p.x, y: V.y + p.y }; }
+  function drawEdge(g, V, dir, len, cls) {
+    var e = endPoint(V, dir, len);
+    return AP.el('line', { x1: V.x, y1: V.y, x2: e.x, y2: e.y, 'class': cls || 'ray' }, g);
+  }
+  function setEdge(line, V, dir, len) { var e = endPoint(V, dir, len); line.setAttribute('x2', e.x); line.setAttribute('y2', e.y); }
+
+  /* ================================================================
+   * 🔍 探索
+   * ============================================================== */
+  var exSvg = document.getElementById('exSvg');
+  var exTitle = document.getElementById('exTitle'), exText = document.getElementById('exText');
+  var exCtrl = document.getElementById('exCtrl'), exMsg = document.getElementById('exMsg');
+  var exNav = document.getElementById('exNav');
+  var EXPLORE = [
+    { id: 'e1', label: '測量三步驟（問1）', run: exSteps },
+    { id: 'e2', label: '邊太短（問2）', run: exShort },
+    { id: 'e3', label: '奇奇和妙妙（動動腦）', run: exQiqi },
+    { id: 'e4', label: '平角（問7）', run: exStraight }
+  ];
+  EXPLORE.forEach(function (e, i) {
+    exNav.appendChild(h('button', { text: e.label, 'data-ex': e.id, onclick: function () { showExplore(i); } }));
+  });
+  function showExplore(i) {
+    Array.prototype.forEach.call(exNav.children, function (b, j) { b.classList.toggle('on', i === j); });
+    AP.clear(exSvg); exSvg.setAttribute('viewBox', VB);
+    exCtrl.innerHTML = ''; UI.say(exMsg, '');
+    EXPLORE[i].run();
+  }
+
+  // E1 問1 印p36
+  function exSteps() {
+    exTitle.textContent = '要怎麼用量角器量出這個角是幾度？';
+    exText.textContent = '課本 問1 印p36 的三個步驟。一步一步按。';
+    var V = { x: 230, y: 340 }, base = 15, other = 85, R = 200;
+    var st = { cx: 480, cy: 450, rot: 0 };
+    var ang = AP.el('g', {}, exSvg);
+    drawEdge(ang, V, base, 320); drawEdge(ang, V, other, 320);
+    AP.wedge(ang, V.x, V.y, base, other, 40, 'wedge');
+    var prot = AP.drawProtractor(exSvg, { r: R, style: 'L' });
+    function place() { AP.place(prot, st.cx, st.cy, st.rot); }
+    place();
+    var b1, b2, b3;
+    b1 = h('button', { 'class': 'btn primary', text: '步驟①', onclick: function () {
+      b1.disabled = true;
+      var x0 = st.cx, y0 = st.cy;
+      animate(900, function (k) { st.cx = x0 + (V.x - x0) * k; st.cy = y0 + (V.y - y0) * k; place(); }, function () { b2.disabled = false; });
+      UI.say(exMsg, '① 把量角器的中心點對齊角的頂點。', 'ok');
+    } });
+    b2 = h('button', { 'class': 'btn primary', text: '步驟②', disabled: 'disabled', onclick: function () {
+      b2.disabled = true;
+      animate(900, function (k) { st.rot = base * k; place(); }, function () { b3.disabled = false; });
+      UI.say(exMsg, '② 將刻度 0 的線，對齊角的一邊。', 'ok');
+    } });
+    b3 = h('button', { 'class': 'btn primary', text: '步驟③', disabled: 'disabled', onclick: function () {
+      b3.disabled = true;
+      AP.highlightLabel(prot, 'inner', 0); AP.highlightLabel(prot, 'inner', other - base);
+      UI.say(exMsg, '③ 從刻度 0 開始，數到角的另一邊為止。這條邊壓在紅字那一圈的 0，數到 70，這個角是 70°。', 'ok');
+    } });
+    exCtrl.appendChild(h('div', { 'class': 'row' }, [b1, b2, b3,
+      h('button', { 'class': 'btn', text: '重來', onclick: function () { showExplore(0); } })]));
+  }
+
+  // E2 問2 印p36
+  function exShort() {
+    exTitle.textContent = '角的邊不夠長怎麼辦？';
+    exText.textContent = '拖動兩條邊的端點，把邊延長。延長以後，角的大小會改變嗎？';
+    var V = { x: 320, y: 420 }, R = 240, a = 0, b = 120, la = 60, lb = 60;
+    var prot = AP.drawProtractor(exSvg, { r: R, style: 'L' }); AP.place(prot, V.x, V.y, 0);
+    var g = AP.el('g', {}, exSvg);
+    AP.wedge(g, V.x, V.y, a, b, 30, 'wedge');
+    var ea = drawEdge(g, V, a, la), eb = drawEdge(g, V, b, lb);
+    var ha = AP.el('circle', { r: 22, 'class': 'handle' }, exSvg), hb = AP.el('circle', { r: 22, 'class': 'handle' }, exSvg);
+    var lit = [];
+    function proj(p, dir) { var u = AP.pt(dir, 1); return (p.x - V.x) * u.x + (p.y - V.y) * u.y; }
+    function upd() {
+      setEdge(ea, V, a, la); setEdge(eb, V, b, lb);
+      var pa = endPoint(V, a, la), pb = endPoint(V, b, lb);
+      ha.setAttribute('cx', pa.x); ha.setAttribute('cy', pa.y); hb.setAttribute('cx', pb.x); hb.setAttribute('cy', pb.y);
+      lit.forEach(function (n) { n.remove(); }); lit = [];
+      if (lb > R * 0.62) {
+        lit.push(AP.highlightLabel(prot, 'inner', 0), AP.highlightLabel(prot, 'inner', b));
+        UI.say(exMsg, '看得到刻度了：從紅字那一圈的 0 數到 120。角的大小還是 120°，延長邊不會改變角的大小。', 'ok');
+      } else {
+        UI.say(exMsg, '邊太短了，看不到刻度。角的大小是 120°。', '');
+      }
+    }
+    AP.drag(exSvg, ha, { move: function (p) { la = Math.max(60, Math.min(300, proj(p, a))); upd(); } });
+    AP.drag(exSvg, hb, { move: function (p) { lb = Math.max(60, Math.min(300, proj(p, b))); upd(); } });
+    upd();
+  }
+
+  // E3 動動腦 印p36
+  function exQiqi() {
+    exTitle.textContent = '奇奇和妙妙的量法正確嗎？';
+    exText.textContent = '按「檢查中心點」和「檢查 0 線」，看看兩個人哪裡對、哪裡不對。';
+    var R = 130;
+    var Q = { cx: 150, cy: 330, V: { x: 210, y: 330 }, rot: 0, base: 180, other: 145 };
+    var M = { cx: 480, cy: 330, V: { x: 480, y: 330 }, rot: 12, base: 12, other: 50 };
+    [Q, M].forEach(function (s, i) {
+      var t = AP.el('text', { x: s.cx - 40, y: 120, 'font-size': 26 }, exSvg); t.textContent = i ? '妙妙' : '奇奇';
+      var p = AP.drawProtractor(exSvg, { r: R, style: 'L' }); AP.place(p, s.cx, s.cy, s.rot);
+      drawEdge(exSvg, s.V, s.base, 200); drawEdge(exSvg, s.V, s.other, 200);
+    });
+    var marks = AP.el('g', {}, exSvg);
+    exCtrl.appendChild(h('div', { 'class': 'row' }, [
+      h('button', { 'class': 'btn', text: '檢查中心點', onclick: function () {
+        AP.clear(marks);
+        [Q, M].forEach(function (s) {
+          AP.el('circle', { cx: s.cx, cy: s.cy, r: 9, fill: '#f9a825' }, marks);
+          AP.el('circle', { cx: s.V.x, cy: s.V.y, r: 14, fill: 'none', stroke: s.cx === s.V.x ? '#2e7d32' : '#c62828', 'stroke-width': 4 }, marks);
+        });
+        UI.say(exMsg, '奇奇：中心點（黃點）沒有對到角的頂點（紅圈），量法不正確。妙妙：中心點對到頂點了。', 'ok');
+      } }),
+      h('button', { 'class': 'btn', text: '檢查 0 線', onclick: function () {
+        AP.clear(marks);
+        [Q, M].forEach(function (s) {
+          var a = AP.pt(s.rot, R), b = AP.pt(s.rot + 180, R);
+          AP.el('line', { x1: s.cx + a.x, y1: s.cy + a.y, x2: s.cx + b.x, y2: s.cy + b.y, stroke: '#f9a825', 'stroke-width': 6, opacity: .8 }, marks);
+        });
+        UI.say(exMsg, '妙妙的量角器斜斜的，可是刻度 0 的線壓在角的一條邊上，中心點也對到頂點，所以妙妙量法正確。斜斜放也可以。', 'ok');
+      } })
+    ]));
+  }
+
+  // E4 問7 印p39
+  function exStraight() {
+    exTitle.textContent = '下圖中的角是多少度？';
+    exText.textContent = '藍色邊不動，拖動紅色邊慢慢張開，現在這個角是多少度呢？';
+    var V = { x: 320, y: 400 }, R = 250, red = 150;
+    var prot = AP.drawProtractor(exSvg, { r: R, style: 'L' }); AP.place(prot, V.x, V.y, 0);
+    var w = AP.wedge(exSvg, V.x, V.y, red, 180, 50, 'wedge');
+    drawEdge(exSvg, V, 180, 300, 'ray');
+    var redL = drawEdge(exSvg, V, red, 300, 'ray2');
+    var hd = AP.el('circle', { r: 26, 'class': 'handle' }, exSvg);
+    function upd() {
+      setEdge(redL, V, red, 300); AP.setWedge(w, red, 180, 50);
+      var e = endPoint(V, red, 280); hd.setAttribute('cx', e.x); hd.setAttribute('cy', e.y);
+      var c = 180 - red;
+      var t = '這個角是 ' + c + '°';
+      if (c === 90) t += '，是直角。';
+      else if (c === 180) t += '。藍色邊和紅色邊成一直線，它是一個平平的角，我們稱它是平角。';
+      else t += '。';
+      UI.say(exMsg, t, 'ok');
+    }
+    AP.drag(exSvg, hd, { move: function (p) {
+      var t = p.y > V.y ? (p.x < V.x ? 180 : 0) : Math.round(AP.angleAt(V.x, V.y, p.x, p.y));
+      if (Math.abs(t - 90) <= 2) t = 90;
+      if (t <= 2) t = 0;
+      red = Math.max(0, Math.min(180, t)); upd();
+    } });
+    upd();
+  }
+
+  /* ================================================================
+   * ✏️ 練習
+   * ============================================================== */
+  var LEVELS = [
+    { id: 'l1', label: '估一估（問5）', render: renderEstimate },
+    { id: 'l2', label: '自己量（問1）', render: function (s, api) { renderMeasure(s, api, false); } },
+    { id: 'l3', label: '邊太短（問2）', render: function (s, api) { renderMeasure(s, api, true); } },
+    { id: 'c3', label: '附件7（問3）', card: { id: 'act2-q3', src: '課本 問3 印p36', title: '拿出附件 7 的 4 個角，量量看，各是幾度？', text: '請用<b>真的量角器</b>量。附件上角的度數課本沒有印出來，網頁沒辦法幫你對答案，請和同學互相檢查。' } },
+    { id: 'l4', label: '量法對嗎（動動腦）', render: renderJudge },
+    { id: 'c4', label: '三角板（問4）', card: { id: 'act2-q4', src: '課本 問4 印p37', title: '拿出兩個三角板，它們共有 6 個角，量量看，各是幾度？', text: '用真的量角器量三角板的角。∠3 和 ∠5 都是直角，是幾度？還有哪兩個角一樣大？' } },
+    { id: 'c6', label: '分類（問6）', card: { id: 'act2-q6', src: '課本 問6 印p38', title: '量量看課本上的 ∠1～∠6，記在表中，再分類。', text: '量課本紙上印的角，分成「等於 90° 的角」「小於 90° 的角」「大於 90° 的角」。說說看，哪些是直角、銳角、鈍角？' } },
+    { id: 'c8', label: '拼平角（問8）', card: { id: 'act2-q8', src: '課本 問8 印p39', title: '和同學合作，用三角板上的角拼出一個平角。', text: '說說看，你們是怎麼拼的？還有其他的拼法嗎？' } },
+    { id: 'l5', label: '畫角做記號（問9）', render: renderMark },
+    { id: 'c9', label: '紙上畫角（做做看）', card: { id: 'act2-q9', src: '課本 問9 做做看 印p40；練習百分百（三）第1題 印p46', title: '用直尺和量角器在紙上畫出 70° 和 135° 的角。', text: '畫完和同學互相檢查。課本容許 2 度以內的誤差。<br>再量一量課本 印p46 練習百分百（三）第 1 題的三個角，是直角、銳角還是鈍角？' } }
+  ];
+  UI.levels(document.getElementById('lvNav'), document.getElementById('lvStage'), LEVELS, 'act2');
+
+  function layout(stage, title, src, q) {
+    var svg = AP.el('svg', { viewBox: VB });
+    var board = h('div', { 'class': 'board' }); board.appendChild(svg);
+    var parts = {
+      svg: svg, prog: h('div', { 'class': 'src', text: src || '' }), q: h('div', { 'class': 'q', text: q || '' }),
+      inputs: h('div'), btns: h('div', { 'class': 'row' }), msg: h('div', { 'class': 'msg' })
+    };
+    var side = h('div', { 'class': 'side' }, [h('h2', { text: title }), parts.prog, parts.q, parts.inputs, parts.btns, parts.msg]);
+    stage.appendChild(h('div', { 'class': 'stage' }, [board, side]));
+    return parts;
+  }
+  function nextBtn(ui, last, api, onNext) {
+    ui.btns.innerHTML = '';
+    if (last) api.pass();
+    ui.btns.appendChild(h('button', { 'class': 'btn primary', 'data-act': 'next', text: last ? '這一關完成！下一關' : '下一題', onclick: function () {
+      if (last) api.next(); else onNext();
+    } }));
+  }
+  function randomAngle() {
+    var c;
+    do { c = rint(4, 32) * 5; } while (!C.isReadingItemUsable({ rays: [0, c] }));
+    return c;
+  }
+
+  // 關1 估一估 問5 印p37
+  function renderEstimate(stage, api) {
+    var N = 5, idx = 0;
+    var ui = layout(stage, '估一估（問5）', '課本 問5 印p37', '這個角比 90° 小還是大？先估估看，再看實際是幾度。');
+    function load() {
+      AP.clear(ui.svg); ui.inputs.innerHTML = ''; ui.btns.innerHTML = ''; UI.say(ui.msg, '');
+      ui.prog.textContent = '課本 問5 印p37　第 ' + (idx + 1) + ' / ' + N + ' 題';
+      var c; do { c = rint(2, 34) * 5; } while (c >= 80 && c <= 100);
+      var base = rint(0, 359), V = { x: 320, y: 270 };
+      var g = AP.el('g', {}, ui.svg);
+      drawEdge(g, V, base, 200); drawEdge(g, V, base + c, 200);
+      AP.wedge(g, V.x, V.y, base, base + c, 36, 'wedge');
+      var side = null;
+      var bS = h('button', { 'class': 'btn', text: '比 90° 小', 'data-act': 'less', onclick: function () { pickSide('less'); } });
+      var bL = h('button', { 'class': 'btn', text: '比 90° 大', 'data-act': 'more', onclick: function () { pickSide('more'); } });
+      var slider = h('input', { type: 'range', min: 0, max: 180, step: 5, value: 90, style: 'width:100%;height:48px', 'data-f': 'est', disabled: 'disabled' });
+      var shown = h('span', { 'class': 'q', text: '我估 90°' });
+      slider.addEventListener('input', function () { shown.textContent = '我估 ' + slider.value + '°'; });
+      var reveal = h('button', { 'class': 'btn primary', text: '量量看', 'data-act': 'reveal', disabled: 'disabled', onclick: function () {
+        var p = AP.drawProtractor(ui.svg, { r: 180, style: 'L' }); AP.place(p, V.x, V.y, base);
+        var est = parseInt(slider.value, 10);
+        UI.say(ui.msg, '實測是 ' + c + '°，你估 ' + est + '°，差 ' + Math.abs(est - c) + '°。', 'ok');
+        nextBtn(ui, idx === N - 1, api, function () { idx++; load(); });
+      } });
+      function pickSide(sv) {
+        side = sv; bS.classList.toggle('sel', sv === 'less'); bL.classList.toggle('sel', sv === 'more');
+        var right = (c < 90 ? 'less' : 'more') === sv;
+        if (right) {
+          UI.say(ui.msg, '對，這個角' + (c < 90 ? '比 90° 小' : '比 90° 大') + '。再估估看大約幾度。', 'ok');
+          slider.removeAttribute('disabled'); reveal.removeAttribute('disabled');
+        } else {
+          AP.el('path', { d: 'M ' + V.x + ' ' + V.y + ' L ' + endPoint(V, base, 90).x + ' ' + endPoint(V, base, 90).y +
+            ' L ' + endPoint(V, base + 90, 90).x + ' ' + endPoint(V, base + 90, 90).y + ' Z',
+            fill: 'rgba(255,193,7,.35)', stroke: '#f9a825', 'stroke-width': 2 }, ui.svg);
+          UI.say(ui.msg, '疊一個直角比比看，再選一次。', 'bad');
+        }
+      }
+      ui.inputs.appendChild(h('div', { 'class': 'row' }, [bS, bL]));
+      ui.inputs.appendChild(h('div', {}, [shown, slider]));
+      ui.btns.appendChild(reveal);
+    }
+    load();
+  }
+
+  // 關2、3 自己擺量角器
+  function renderMeasure(stage, api, short) {
+    var N = short ? 3 : 4, idx = 0;
+    var title = short ? '邊太短（問2）' : '自己量（問1）';
+    var src = short ? '課本 問2 印p36' : '課本 問1 印p36';
+    var ui = layout(stage, title, src, '');
+    var R = 190;
+    function load() {
+      AP.clear(ui.svg); ui.inputs.innerHTML = ''; ui.btns.innerHTML = ''; UI.say(ui.msg, '');
+      ui.prog.textContent = src + '　第 ' + (idx + 1) + ' / ' + N + ' 題';
+      var c = randomAngle(), base = rint(0, 359);
+      var V = { x: 320 + rint(-40, 40), y: 250 + rint(-30, 30) };
+      var e1 = base, e2 = base + c;
+      var len = short ? [70, 70] : [230, 230];
+      var st = { cx: 130, cy: 420, rot: 0, stage: 'A' };
+
+      var angG = AP.el('g', {}, ui.svg);
+      AP.wedge(angG, V.x, V.y, e1, e2, 28, 'wedge');
+      var l1 = drawEdge(angG, V, e1, len[0]), l2 = drawEdge(angG, V, e2, len[1]);
+      AP.el('circle', { cx: V.x, cy: V.y, r: 4, fill: '#1e88e5' }, angG);
+
+      var prot = AP.drawProtractor(ui.svg, { r: R, style: Math.random() < 0.5 ? 'L' : 'R' });
+      var ring = AP.el('path', { d: AP.arcPath(-8, 188, R + 24), 'class': 'ring-handle', visibility: 'hidden' }, prot);
+      var baseLine = prot.querySelector('.pr-base');
+      var ends = [], hdl = [];
+      if (short) {
+        [0, 1].forEach(function (i) {
+          var hc = AP.el('circle', { r: 20, 'class': 'handle' }, ui.svg);
+          hdl.push(hc);
+          AP.drag(ui.svg, hc, { move: function (p) {
+            var dir = i ? e2 : e1, u = AP.pt(dir, 1);
+            len[i] = Math.max(70, Math.min(300, (p.x - V.x) * u.x + (p.y - V.y) * u.y));
+            placeEnds(); check();
+          } });
+        });
+      }
+      function placeEnds() {
+        setEdge(l1, V, e1, len[0]); setEdge(l2, V, e2, len[1]);
+        hdl.forEach(function (hc, i) { var e = endPoint(V, i ? e2 : e1, len[i]); hc.setAttribute('cx', e.x); hc.setAttribute('cy', e.y); });
+      }
+      placeEnds();
+      function place() { AP.place(prot, st.cx, st.cy, st.rot); }
+      place();
+
+      var inp = h('input', { 'class': 'num', type: 'number', inputmode: 'numeric', 'data-f': 'ans', disabled: 'disabled' });
+      var rotL = h('button', { 'class': 'btn', text: '◀1°', 'data-act': 'rotL', disabled: 'disabled', onclick: function () { st.rot += 1; place(); check(); } });
+      var rotR = h('button', { 'class': 'btn', text: '1°▶', 'data-act': 'rotR', disabled: 'disabled', onclick: function () { st.rot -= 1; place(); check(); } });
+      var stepText = h('div', { 'class': 'q' });
+      ui.inputs.appendChild(stepText);
+      ui.inputs.appendChild(h('div', { 'class': 'row' }, [rotL, rotR]));
+      ui.inputs.appendChild(h('div', { 'class': 'row' }, [inp, h('span', { text: '度' })]));
+      var checkBtn = h('button', { 'class': 'btn primary', text: '確定', 'data-act': 'check', onclick: submit });
+      ui.btns.appendChild(checkBtn);
+      ui.btns.appendChild(h('button', { 'class': 'btn', text: '重擺', 'data-act': 'reset', onclick: function () {
+        st = { cx: 130, cy: 420, rot: 0, stage: 'A' }; place(); setStageA();
+      } }));
+
+      function setStageA() {
+        st.stage = 'A'; ring.setAttribute('visibility', 'hidden');
+        rotL.disabled = true; rotR.disabled = true; inp.disabled = true; baseLine.classList.remove('okline');
+        stepText.textContent = '步驟①：拖動量角器，把中心點對到角的頂點。';
+        UI.say(ui.msg, '');
+      }
+      setStageA();
+
+      var grab = null;
+      AP.drag(ui.svg, prot, {
+        start: function (p, e) {
+          if (e.target === ring) { if (st.stage === 'A') return; grab = { mode: 'rot', a0: AP.angleAt(st.cx, st.cy, p.x, p.y), r0: st.rot }; }
+          else if (st.stage === 'A') grab = { mode: 'move', dx: p.x - st.cx, dy: p.y - st.cy };
+          else grab = null;
+        },
+        move: function (p) {
+          if (!grab) return;
+          if (grab.mode === 'move') { st.cx = p.x - grab.dx; st.cy = p.y - grab.dy; place(); }
+          else { st.rot = Math.round(grab.r0 + AP.angleAt(st.cx, st.cy, p.x, p.y) - grab.a0); place(); check(); }
+        },
+        end: function () {
+          if (!grab) return;
+          if (grab.mode === 'move') {
+            var r = C.checkAlignment({ cx: st.cx, cy: st.cy, rot: st.rot, r: R }, { vx: V.x, vy: V.y, e1: e1, e2: e2 });
+            if (r.code === 'CENTER_OFF') UI.say(ui.msg, MSG.CENTER_OFF, 'bad');
+            else {
+              var x0 = st.cx, y0 = st.cy;
+              animate(250, function (k) { st.cx = x0 + (V.x - x0) * k; st.cy = y0 + (V.y - y0) * k; place(); }, function () {
+                st.stage = 'B'; ring.setAttribute('visibility', 'visible'); rotL.disabled = false; rotR.disabled = false;
+                stepText.textContent = '步驟②：轉動外面的圓環（或按 ◀1°、1°▶），讓刻度 0 的線壓在角的一條邊上。';
+                check();
+                // check() 會寫入下一步提示，把「中心點對好了」接在前面，避免被蓋掉
+                if (!aligned) UI.say(ui.msg, '中心點對好了！' + ui.msg.textContent, 'ok');
+              });
+            }
+          }
+          grab = null;
+        }
+      });
+
+      var aligned = null;
+      function check() {
+        if (st.stage === 'A') return;
+        var r = C.checkAlignment({ cx: st.cx, cy: st.cy, rot: st.rot, r: R }, { vx: V.x, vy: V.y, e1: AP.norm360(e1), e2: AP.norm360(e2) });
+        aligned = null;
+        baseLine.classList.toggle('okline', r.code === 'ALIGNED');
+        if (r.code !== 'ALIGNED') { inp.disabled = true; stepText.textContent = '步驟②：轉動外面的圓環（或按 ◀1°、1°▶），讓刻度 0 的線壓在角的一條邊上。'; UI.say(ui.msg, MSG[r.code], r.code === 'ANGLE_OUTSIDE' ? 'bad' : ''); return; }
+        // checkAlignment 回傳的 otherTheta 就是 norm360(那條邊 − rot)，比對即可知道是哪一條邊
+        var otherIdx = Math.abs(AP.norm360(e1 - st.rot) - r.otherTheta) < 1e-6 ? 0 : 1;
+        var otherLen = len[otherIdx];
+        if (otherLen < R * 0.62) { inp.disabled = true; UI.say(ui.msg, MSG.SHORT, ''); return; }
+        aligned = r;
+        inp.disabled = false;
+        stepText.textContent = '步驟③：從刻度 0 開始，數到角的另一邊為止。';
+        UI.say(ui.msg, '0 線壓在邊上了！讀讀看是幾度。', 'ok');
+      }
+
+      function submit() {
+        if (!aligned) { UI.say(ui.msg, st.stage === 'A' ? MSG.CENTER_OFF : MSG.ZERO_LINE_OFF, 'bad'); return; }
+        var v = parseInt(inp.value, 10);
+        if (isNaN(v)) { UI.say(ui.msg, '先填一個數字。', 'bad'); return; }
+        var code;
+        if (Math.abs(v - c) <= C.READ_TOL) code = 'CORRECT';
+        else if (Math.abs(v - (180 - c)) <= C.READ_TOL) code = 'WRONG_RING';
+        else code = C.diagnoseReadingSingle({ answer: v, rays: [0, c], style: 'L' }).code;
+        if (code !== 'CORRECT') { UI.say(ui.msg, MSG[code], 'bad'); return; }
+        UI.say(ui.msg, '答對了！這個角是 ' + c + '°，是' + kind(c) + '。', 'ok');
+        nextBtn(ui, idx === N - 1, api, function () { idx++; load(); });
+      }
+    }
+    load();
+  }
+
+  // 關4 動動腦 量法對嗎
+  function scenario(type) {
+    var c = rint(6, 30) * 5, base = type === 'ok' ? 0 : rint(15, 35) * (Math.random() < 0.5 ? 1 : -1);
+    var V = { x: 320, y: 300 };
+    var s = { type: type, c: c, base: base, V: V, cx: V.x, cy: V.y, rot: base };
+    if (type === 'center') { var u = AP.pt(base, 50); s.cx = V.x - u.x; s.cy = V.y - u.y; }
+    if (type === 'zero') s.rot = base + (Math.random() < 0.5 ? 14 : -14);
+    return s;
+  }
+  function drawScenario(svg, s, R) {
+    AP.clear(svg);
+    var p = AP.drawProtractor(svg, { r: R, style: 'L' }); AP.place(p, s.cx, s.cy, s.rot);
+    drawEdge(svg, s.V, s.base, R + 50); drawEdge(svg, s.V, s.base + s.c, R + 50);
+    AP.el('circle', { cx: s.V.x, cy: s.V.y, r: 4, fill: '#1e88e5' }, svg);
+  }
+  var REASONS = [['center', '中心點沒對到頂點'], ['zero', '刻度 0 的線沒壓在邊上'], ['tilt', '量角器擺斜了']];
+
+  function renderJudge(stage, api) {
+    var types = UI.shuffle(['ok', 'tilt', 'center', 'zero']).concat(UI.shuffle(['tilt', 'center']));
+    var idx = 0;
+    var ui = layout(stage, '量法對嗎（動動腦）', '', '這樣量角，量法正確嗎？');
+    function load() {
+      var s = scenario(types[idx]);
+      ui.prog.textContent = '課本 動動腦 印p36；習作 印p32 題型　第 ' + (idx + 1) + ' / ' + types.length + ' 題';
+      drawScenario(ui.svg, s, 190);
+      ui.inputs.innerHTML = ''; ui.btns.innerHTML = ''; UI.say(ui.msg, '');
+      var reasonRow = h('div', { 'class': 'row', hidden: 'hidden' });
+      var right = s.type === 'ok' || s.type === 'tilt';
+      function done() { nextBtn(ui, idx === types.length - 1, api, function () { idx++; load(); }); }
+      ui.inputs.appendChild(h('div', { 'class': 'row' }, [
+        h('button', { 'class': 'btn', text: '正確', 'data-act': 'right', onclick: function () {
+          if (right) { UI.say(ui.msg, '對！中心點對到頂點，0 線也壓在邊上。' + (s.type === 'tilt' ? '量角器斜斜的也可以。' : ''), 'ok'); done(); }
+          else UI.say(ui.msg, '再檢查：中心點有對到頂點嗎？刻度 0 的線有壓在邊上嗎？', 'bad');
+        } }),
+        h('button', { 'class': 'btn', text: '不正確', 'data-act': 'wrong', onclick: function () {
+          if (right) { UI.say(ui.msg, '再檢查：中心點對到頂點、0 線壓在邊上，就是正確的。' + (s.type === 'tilt' ? '量角器斜斜的也可以。' : ''), 'bad'); return; }
+          reasonRow.hidden = false; UI.say(ui.msg, '哪裡不正確？', '');
+        } })
+      ]));
+      REASONS.forEach(function (r) {
+        reasonRow.appendChild(h('button', { 'class': 'btn', text: r[1], 'data-reason': r[0], onclick: function () {
+          if (r[0] === s.type) { UI.say(ui.msg, '對！' + r[1] + '。', 'ok'); done(); }
+          else if (r[0] === 'tilt') UI.say(ui.msg, '量角器斜斜的也可以，只要中心點對頂點、0 線壓在邊上。再看一次哪裡不對。', 'bad');
+          else UI.say(ui.msg, '再看一次，' + r[1] + '嗎？', 'bad');
+        } }));
+      });
+      ui.inputs.appendChild(reasonRow);
+    }
+    load();
+  }
+
+  // 關5 問9 印p40 定刻度點
+  var MARK_MSG = {
+    WRONG_RING: '你畫的角比直角大還是小？題目要的角呢？',
+    AMBIGUOUS: '再看一次刻度，從 0 開始數。',
+    OTHER: '從刻度 0 開始，順著那一圈數到題目的度數，再做記號。'
+  };
+  function renderMark(stage, api) {
+    var targets = [{ t: 65, src: '課本 問9 印p40' }, { t: 70, src: '課本 問9 做做看 印p40' }, { t: 135, src: '課本 問9 做做看 印p40' }];
+    while (targets.length < 6) { var t = rint(3, 34) * 5; if (C.isMarkTargetUsable(t)) targets.push({ t: t, src: '再練一題' }); }
+    var idx = 0, R = 250, V = { x: 320, y: 400 };
+    var ui = layout(stage, '畫角做記號（問9）', '', '');
+    function load() {
+      var tg = targets[idx];
+      ui.prog.textContent = tg.src + '　第 ' + (idx + 1) + ' / ' + targets.length + ' 題';
+      ui.q.textContent = '要畫出 ' + tg.t + '° 的角。量角器已經對好了（中心點對頂點、刻度 0 的線對齊這條邊）。在量角器上 ' + tg.t + '° 的地方點一下做記號。';
+      AP.clear(ui.svg); ui.inputs.innerHTML = ''; ui.btns.innerHTML = ''; UI.say(ui.msg, '');
+      var p = AP.drawProtractor(ui.svg, { r: R, style: 'L' }); AP.place(p, V.x, V.y, 0);
+      drawEdge(ui.svg, V, 0, R + 40);
+      var markG = AP.el('g', {}, ui.svg);
+      var hit = AP.el('path', { d: 'M ' + (V.x - R - 20) + ' ' + V.y + ' A ' + (R + 20) + ' ' + (R + 20) + ' 0 0 1 ' + (V.x + R + 20) + ' ' + V.y + ' Z', fill: 'transparent', 'data-hit': 'arc', style: 'cursor:crosshair' }, ui.svg);
+      var locked = false;
+      hit.addEventListener('click', function (e) {
+        if (locked) return;
+        var q = AP.svgPoint(ui.svg, e);
+        var m = Math.max(0, Math.min(180, Math.round(AP.angleAt(V.x, V.y, q.x, q.y))));
+        AP.clear(markG);
+        var dot = AP.pt(m, R + 6);
+        AP.el('circle', { cx: V.x + dot.x, cy: V.y + dot.y, r: 7, fill: '#d32f2f' }, markG);
+        drawEdge(markG, V, m, R + 40, 'ray2');
+        var code = C.diagnoseMark({ markDeg: m, target: tg.t }).code;
+        if (code === 'CORRECT') {
+          locked = true;
+          UI.say(ui.msg, '對！拿開量角器，把頂點和記號連成一直線，標上弧線和 ' + tg.t + '°。（課本容許 2 度以內的誤差）', 'ok');
+          nextBtn(ui, idx === targets.length - 1, api, function () { idx++; load(); });
+        } else {
+          UI.say(ui.msg, MARK_MSG[code], 'bad');
+        }
+      });
+    }
+    load();
+  }
+
+  /* ================================================================
+   * 🏆 挑戰
+   * ============================================================== */
+  (function () {
+    var box = document.getElementById('chBox');
+    var types = UI.shuffle(['ok', 'tilt', 'center', 'zero']);
+    var answers = {};
+    var grid = h('div', { style: 'display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px' });
+    types.forEach(function (tp, i) {
+      var s = scenario(tp);
+      var svg = AP.el('svg', { viewBox: '60 20 520 400' });
+      drawScenario(svg, s, 170);
+      var board = h('div', { 'class': 'board' }); board.appendChild(svg);
+      var bOk = h('button', { 'class': 'btn', text: '✓ 正確', 'data-ch': i + '-ok' });
+      var bNo = h('button', { 'class': 'btn', text: '✗ 不正確', 'data-ch': i + '-no' });
+      bOk.onclick = function () { answers[i] = true; bOk.classList.add('sel'); bNo.classList.remove('sel'); };
+      bNo.onclick = function () { answers[i] = false; bNo.classList.add('sel'); bOk.classList.remove('sel'); };
+      grid.appendChild(h('div', { 'class': 'side' }, [h('h2', { text: '第 ' + (i + 1) + ' 圖' }), board, h('div', { 'class': 'row' }, [bOk, bNo])]));
+    });
+    var msg = h('div', { 'class': 'msg' });
+    box.appendChild(grid);
+    box.appendChild(h('div', { 'class': 'row' }, [h('button', { 'class': 'btn primary', text: '對答案', 'data-act': 'grade', onclick: function () {
+      var wrong = [];
+      types.forEach(function (tp, i) { if (answers[i] !== (tp === 'ok' || tp === 'tilt')) wrong.push(i + 1); });
+      if (Object.keys(answers).length < 4) { UI.say(msg, '四張圖都要選。', 'bad'); return; }
+      UI.say(msg, wrong.length ? '第 ' + wrong.join('、') + ' 圖再檢查一次：中心點對頂點？0 線壓在邊上？斜斜放是可以的。' : '全對！', wrong.length ? 'bad' : 'ok');
+    } })]));
+    box.appendChild(msg);
+  })();
+
+  UI.tabs();
+  showExplore(0);
+})();
+</script>
+</body>
+</html>

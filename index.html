@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>角度　四上第三單元</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 14px 0; }
+  a.card { display: block; background: #fff; border: 2px solid var(--line); border-radius: 18px; padding: 16px; color: var(--ink); text-decoration: none; min-height: 150px; }
+  a.card:hover, a.card:active { border-color: var(--accent); }
+  a.card .n { font-size: .95rem; color: var(--accent); font-weight: 700; }
+  a.card h2 { margin: 4px 0 6px; font-size: 1.3rem; }
+  a.card p { margin: 0; color: var(--muted); line-height: 1.5; }
+  details { background: #fff; border: 2px solid var(--line); border-radius: 14px; padding: 10px 14px; margin-top: 12px; }
+  details summary { cursor: pointer; font-weight: 700; min-height: 40px; line-height: 40px; }
+  details li { line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>四上第三單元　角度</h1>
+    <span class="src">康軒版數學 4 上</span>
+  </header>
+
+  <p id="later" class="warn" hidden></p>
+
+  <div class="cards">
+    <a class="card" href="act1.html">
+      <div class="n">開門活動＋活動一　課本 p31–35</div>
+      <h2>量角器的認識與報讀</h2>
+      <p>1° 與 10°、角的一邊壓在哪一圈的 0、兩邊都不在 0 怎麼數</p>
+    </a>
+    <a class="card" href="act2.html">
+      <div class="n">活動二　課本 p36–40</div>
+      <h2>測量角的大小和畫角</h2>
+      <p>自己擺量角器、邊太短、奇奇和妙妙、平角、畫角做記號</p>
+    </a>
+    <a class="card" href="act3.html">
+      <div class="n">活動三　課本 p41–43</div>
+      <h2>旋轉角</h2>
+      <p>順時針與逆時針、一大格 30°、周角、量角器上的連續旋轉、金庫密碼</p>
+    </a>
+    <a class="card" href="act4.html">
+      <div class="n">活動四　課本 p44–45</div>
+      <h2>角的合成與分解</h2>
+      <p>三角板拼角、直線與直角上的角、用算式記錄</p>
+    </a>
+  </div>
+
+  <details>
+    <summary>給老師</summary>
+    <ul>
+      <li>每頁分三個分頁：🔍探索（投影給全班看）、✏️練習（學生自己用平板）、🏆挑戰（學力檢測考古題）。練習的關卡照課本題號排。</li>
+      <li>課本裡要用真的量角器、三角板或附件的題目，頁面上是「課堂實作卡」。學生手邊沒有附件時可以按「稍後在課堂做」，這一頁上方會顯示還有幾張沒做。</li>
+      <li><b>網頁上的量角器不等於真的量角器。</b>網頁練得好，不代表學生會擺真的量角器，課堂上一定要實際量、實際畫。</li>
+      <li>有教師手冊明文依據的學生困難：把 70° 讀成 110°（讀錯圈）、角的擺放方向不同就以為角變了（教冊 PDF p36，印 p34 注意事項 2、3）。其他回饋是依課本內容設計的練習提示，不代表學生一定會這樣錯。</li>
+      <li>量角器有兩款：外圈 0 在左（課本的樣子）或在右。活動一問 6 以後兩款隨機出現，提醒學生先找「角的一邊壓在哪一圈的 0」。</li>
+    </ul>
+  </details>
+</div>
+<script src="ui.js"></script>
+<script>
+  (function () {
+    var n = UI.laterCount();
+    var el = document.getElementById('later');
+    if (n > 0) { el.hidden = false; el.textContent = '還有 ' + n + ' 張課堂實作卡選了「稍後在課堂做」。'; }
+  })();
+</script>
+</body>
+</html>

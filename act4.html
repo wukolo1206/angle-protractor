@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>活動四　角的合成與分解</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>活動四　角的合成與分解</h1>
+    <span class="src">課本 印 p44–45；練習百分百（三）第 3 題 印 p46</span>
+    <a class="home" href="index.html">← 回首頁</a>
+  </header>
+
+  <div class="tabs">
+    <button data-tab="explore">🔍 探索</button>
+    <button data-tab="practice">✏️ 練習</button>
+    <button data-tab="challenge">🏆 挑戰</button>
+  </div>
+
+  <section data-panel="explore">
+    <div class="physical">課本要用附件的三角板實際拼拼看。網頁上看完，課堂上再拿三角板拼一次。</div>
+    <div class="levels" id="exNav"></div>
+    <div class="stage">
+      <div class="board"><svg id="exSvg" viewBox="0 0 640 440"></svg></div>
+      <div class="side">
+        <h2 id="exTitle"></h2>
+        <div class="q" id="exText"></div>
+        <div id="exCtrl"></div>
+        <div class="msg" id="exMsg"></div>
+      </div>
+    </div>
+  </section>
+
+  <section data-panel="practice">
+    <div class="levels" id="lvNav"></div>
+    <div id="lvStage"></div>
+  </section>
+
+  <section data-panel="challenge">
+    <div id="chBox"></div>
+  </section>
+</div>
+
+<script src="angle-core.js"></script>
+<script src="protractor.js"></script>
+<script src="ui.js"></script>
+<script>
+(function () {
+  'use strict';
+  var C = window.AngleCore, h = UI.h;
+  var VB = '0 0 640 440';
+  var V = { x: 320, y: 360 }, L = 260;
+  var COLORS = ['rgba(139,195,74,.55)', 'rgba(56,142,60,.55)', 'rgba(255,193,7,.45)'];
+
+  function line(svg, t, cls) { return AP.ray(svg, V.x, V.y, t, L, cls || 'ray'); }
+  function labelAt(svg, t, rho, text, color) {
+    var p = AP.pt(t, rho);
+    var tx = AP.el('text', { x: V.x + p.x, y: V.y + p.y, 'font-size': 22, 'text-anchor': 'middle', 'dominant-baseline': 'middle', fill: color || '#263238', 'font-weight': 700 }, svg);
+    tx.textContent = text;
+    return tx;
+  }
+  function arcMark(svg, t1, t2, rho, color) {
+    return AP.el('path', { d: AP.arcPath(t1, t2, rho), fill: 'none', stroke: color || '#d32f2f', 'stroke-width': 3, transform: 'translate(' + V.x + ' ' + V.y + ')' }, svg);
+  }
+
+  /* ================================================================
+   * 🔍 探索
+   * ============================================================== */
+  var exSvg = document.getElementById('exSvg');
+  var exTitle = document.getElementById('exTitle'), exText = document.getElementById('exText');
+  var exCtrl = document.getElementById('exCtrl'), exMsg = document.getElementById('exMsg');
+  var exNav = document.getElementById('exNav');
+  var EXPLORE = [
+    { id: 'e1', label: '三角板拼疊（問1）', run: exTriangles },
+    { id: 'e2', label: '直線與直角上的角（問2–3）', run: exLine }
+  ];
+  EXPLORE.forEach(function (e, i) {
+    exNav.appendChild(h('button', { text: e.label, 'data-ex': e.id, onclick: function () { showExplore(i); } }));
+  });
+  function showExplore(i) {
+    Array.prototype.forEach.call(exNav.children, function (b, j) { b.classList.toggle('on', i === j); });
+    AP.clear(exSvg); exCtrl.innerHTML = ''; UI.say(exMsg, '');
+    EXPLORE[i].run();
+  }
+
+  // E1 問1 印p44
+  function exTriangles() {
+    exTitle.textContent = '用三角板拼疊出的角是多少度？';
+    exText.textContent = '選兩個三角板的角。拖動第二個角：拼在第一個角的旁邊是「合起來」，疊在第一個角上面是「相差」。';
+    var A = 45, B = 60, s = 70;
+    var row1 = h('div', { 'class': 'row' }), row2 = h('div', { 'class': 'row' });
+    [30, 45, 60, 90].forEach(function (d) {
+      row1.appendChild(h('button', { 'class': 'btn', text: d + '°', 'data-a': d, onclick: function () { A = d; mark(row1, d); draw(); } }));
+      row2.appendChild(h('button', { 'class': 'btn', text: d + '°', 'data-b': d, onclick: function () { B = d; mark(row2, d); draw(); } }));
+    });
+    function mark(row, d) { Array.prototype.forEach.call(row.children, function (b) { b.classList.toggle('sel', +b.textContent.replace('°', '') === d); }); }
+    exCtrl.appendChild(h('div', {}, [h('span', { text: '第一個角（淺綠）' }), row1, h('span', { text: '第二個角（深綠）' }), row2]));
+    mark(row1, A); mark(row2, B);
+    // 把手只建一次：拖曳中若重建把手，pointer capture 會跟著被刪掉的元素消失，拖不動
+    var layer = AP.el('g', {}, exSvg);
+    var hd = AP.el('circle', { r: 28, 'class': 'handle' }, exSvg);
+    AP.drag(exSvg, hd, { move: function (p) {
+      var t = Math.round(AP.angleAt(V.x, V.y, p.x, p.y) - B / 2);
+      if (Math.abs(t - A) <= 6) t = A;
+      if (Math.abs(t) <= 6) t = 0;
+      s = Math.max(-10, Math.min(180 - B, t)); draw();
+    } });
+    function draw() {
+      AP.clear(layer);
+      AP.wedge(layer, V.x, V.y, 0, A, L - 20, 'wedge').setAttribute('fill', COLORS[0]);
+      var w = AP.wedge(layer, V.x, V.y, s, s + B, L - 60, 'wedge'); w.setAttribute('fill', COLORS[1]);
+      line(layer, 0); line(layer, A);
+      AP.ray(layer, V.x, V.y, s, L - 60, 'ray2'); AP.ray(layer, V.x, V.y, s + B, L - 60, 'ray2');
+      var hp = AP.pt(s + B / 2, (L - 60) * 0.7);
+      hd.setAttribute('cx', V.x + hp.x); hd.setAttribute('cy', V.y + hp.y);
+      if (s === A) UI.say(exMsg, '拼在旁邊，合起來：' + A + '°＋' + B + '°＝' + (A + B) + '°', 'ok');
+      else if (s === 0 && A !== B) {
+        var big = Math.max(A, B), small = Math.min(A, B);
+        UI.say(exMsg, '疊在一起，相差：' + big + '°－' + small + '°＝' + (big - small) + '°', 'ok');
+      } else if (s === 0) UI.say(exMsg, '兩個角一樣大，疊起來剛好重合。', 'ok');
+      else UI.say(exMsg, '把深綠色的角拖到淺綠色角的旁邊，或疊到它上面。');
+    }
+    draw();
+  }
+
+  // E2 問2–3 印p45
+  function exLine() {
+    exTitle.textContent = '直線上、直角裡的角';
+    exText.textContent = '拖動紅色的邊，看看兩個角怎麼變。';
+    var total = 180, rays = [120];
+    // 圖形畫在 layer（每次重畫）；把手在 handleG，只在邊的條數改變時重建，拖曳中不重建
+    var layer = AP.el('g', {}, exSvg), handleG = AP.el('g', {}, exSvg), handles = [];
+    function syncHandles() {
+      if (handles.length === rays.length) return;
+      AP.clear(handleG); handles = [];
+      rays.forEach(function (t, k) {
+        var hd = AP.el('circle', { r: 26, 'class': 'handle' }, handleG);
+        AP.drag(exSvg, hd, { move: function (p) {
+          rays[k] = Math.max(5, Math.min(total - 5, Math.round(AP.angleAt(V.x, V.y, p.x, p.y) / 5) * 5)); draw();
+        } });
+        handles.push(hd);
+      });
+    }
+    function draw() {
+      AP.clear(layer);
+      line(layer, 0); line(layer, total);
+      AP.el('circle', { cx: V.x, cy: V.y, r: 4, fill: '#263238' }, layer);
+      if (total === 90) AP.el('rect', { x: V.x, y: V.y - 18, width: 18, height: 18, fill: 'none', stroke: '#263238' }, layer);
+      var edges = [0].concat(rays.slice().sort(function (a, b) { return a - b; })).concat([total]);
+      var parts = [];
+      for (var i = 0; i < edges.length - 1; i++) {
+        var a = edges[i], b = edges[i + 1];
+        AP.wedge(layer, V.x, V.y, a, b, 90 + 20 * i, 'wedge').setAttribute('fill', COLORS[i % 3]);
+        labelAt(layer, (a + b) / 2, 140 + 20 * i, (b - a) + '°');
+        parts.push(b - a);
+      }
+      syncHandles();
+      rays.forEach(function (t, k) {
+        AP.ray(layer, V.x, V.y, t, L, 'ray2');
+        var e = AP.pt(t, L - 30);
+        handles[k].setAttribute('cx', V.x + e.x); handles[k].setAttribute('cy', V.y + e.y);
+      });
+      UI.say(exMsg, parts.map(function (x) { return x + '°'; }).join('＋') + '＝' + total + '°（' + (total === 180 ? '一直線是平角，180°' : '直角是 90°') + '）', 'ok');
+    }
+    exCtrl.appendChild(h('div', { 'class': 'row' }, [
+      h('button', { 'class': 'btn', text: '直線', onclick: function () { total = 180; rays = [120]; draw(); } }),
+      h('button', { 'class': 'btn', text: '直角', onclick: function () { total = 90; rays = [34]; draw(); } }),
+      h('button', { 'class': 'btn', text: '再加一條邊', onclick: function () { if (rays.length < 2) { rays.push(Math.round(total / 4)); draw(); } } })
+    ]));
+    draw();
+  }
+
+  /* ================================================================
+   * ✏️ 練習
+   * 圖形描述：edges＝要畫的邊（角度）；marks＝[起, 終, 標籤, 是否為所求]
+   * ============================================================== */
+  var ITEMS = [
+    { id: 'p44-1', src: '課本 問1① 印p44', q: '∠4 和 ∠2 合起來是多少度？（∠4 是 45°，∠2 是 60°）',
+      edges: [0, 45, 105], marks: [[0, 45, '∠4 45°'], [45, 105, '∠2 60°'], [0, 105, '?', true]], item: { op: 'add', parts: [45, 60] }, expr: '45°＋60°' },
+    { id: 'p44-2', src: '課本 問1② 印p44', q: '∠4 和 ∠1 相差多少度？（∠4 是 45°，∠1 是 30°）',
+      edges: [0, 30, 45], marks: [[0, 45, '∠4 45°'], [0, 30, '∠1 30°'], [30, 45, '?', true]], item: { op: 'sub', total: 45, parts: [30] }, expr: '45°－30°' },
+    { id: 'p44-d1', src: '課本 做做看① 印p44', q: '∠A＝96°，∠B＝37°，∠A＋∠B＝？',
+      edges: [0, 37, 133], marks: [[0, 37, '∠B 37°'], [37, 133, '∠A 96°'], [0, 133, '?', true]], item: { op: 'add', parts: [96, 37] }, expr: '96°＋37°' },
+    { id: 'p44-d2', src: '課本 做做看② 印p44', q: '∠C＝？',
+      edges: [0, 20, 70], marks: [[0, 70, '70°'], [0, 20, '20°'], [20, 70, '∠C', true]], item: { op: 'sub', total: 70, parts: [20] }, expr: '70°－20°' },
+    { id: 'p45-2', src: '課本 問2 印p45', q: '直線上有兩個角，∠A 是 120°，∠B 是多少度？', straight: true,
+      edges: [0, 60, 180], marks: [[60, 180, '∠A 120°'], [0, 60, '∠B', true]], item: { op: 'sub', total: 180, parts: [120], askTotal: true }, expr: '180°－120°' },
+    { id: 'p45-3', src: '課本 問3 印p45', q: '直角中有兩個角，∠A 是 34°，∠B 是多少度？', right: true,
+      edges: [0, 34, 90], marks: [[0, 34, '∠A 34°'], [34, 90, '∠B', true]], item: { op: 'sub', total: 90, parts: [34], askTotal: true }, expr: '90°－34°' },
+    { id: 'p45-d1', src: '課本 做做看① 印p45', q: '算出圖中的 ∠A 是幾度？', straight: true,
+      edges: [0, 35, 140, 180], marks: [[0, 35, '35°'], [140, 180, '40°'], [35, 140, '∠A', true]], item: { op: 'sub', total: 180, parts: [40, 35], askTotal: true }, expr: '180°－40°－35°' },
+    { id: 'p45-d2', src: '課本 做做看② 印p45', q: '算出圖中的 ∠A 是幾度？', right: true,
+      edges: [0, 18, 38, 90], marks: [[0, 18, '18°'], [38, 90, '52°'], [18, 38, '∠A', true]], item: { op: 'sub', total: 90, parts: [52, 18], askTotal: true }, expr: '90°－52°－18°' },
+    { id: 'p46-1', src: '練習百分百（三）第3題① 印p46', q: '算出圖中的 ∠ㄅ 是幾度？',
+      edges: [0, 57, 97], marks: [[0, 57, '57°'], [57, 97, '40°'], [0, 97, '∠ㄅ', true]], item: { op: 'add', parts: [40, 57] }, expr: '40°＋57°' },
+    { id: 'p46-2', src: '練習百分百（三）第3題② 印p46', q: '算出圖中的 ∠ㄅ 是幾度？', straight: true,
+      edges: [0, 70, 125, 180], marks: [[125, 180, '55°'], [70, 125, '55°'], [0, 70, '∠ㄅ', true]], item: { op: 'sub', total: 180, parts: [55, 55], askTotal: true }, expr: '180°－55°－55°' }
+  ];
+
+  function drawItem(svg, it) {
+    AP.clear(svg);
+    var edges = it.edges.slice();
+    if (it.straight && edges.indexOf(180) < 0) edges.push(180);
+    edges.forEach(function (t) { line(svg, t); });
+    if (it.right) AP.el('rect', { x: V.x, y: V.y - 18, width: 18, height: 18, fill: 'none', stroke: '#263238' }, svg);
+    AP.el('circle', { cx: V.x, cy: V.y, r: 4, fill: '#263238' }, svg);
+    var known = 0;
+    it.marks.forEach(function (mk, i) {
+      var rho = mk[3] ? 70 : 110 + 40 * known;
+      if (!mk[3]) known++;
+      arcMark(svg, mk[0], mk[1], rho, mk[3] ? '#d32f2f' : '#546e7a');
+      labelAt(svg, (mk[0] + mk[1]) / 2, rho + 26, mk[2], mk[3] ? '#d32f2f' : '#263238');
+    });
+  }
+
+  var MSG = {
+    WRONG_OP: '要求的角，是幾個角合起來的大角，還是從大角裡拿掉一塊剩下的？',
+    WRONG_TOTAL: '這些角合起來是一條直線（180°）還是一個直角（90°）？',
+    OMIT_ONE: '圖上還有另一個角也要拿掉。',
+    OTHER: '用算式一步一步記下來，再算一次。',
+    AMBIGUOUS: '用算式一步一步記下來，再算一次。'
+  };
+
+  UI.levels(document.getElementById('lvNav'), document.getElementById('lvStage'),
+    ITEMS.map(function (it, i) { return { id: it.id, label: String(i + 1) + ' ' + it.src.replace(/ 印p\d+/, '').replace('課本 ', '').replace('練習百分百（三）', '練百'), render: function (st, api) { renderItem(st, api, it); } }; }),
+    'act4');
+
+  function renderItem(stage, api, it) {
+    var svg = AP.el('svg', { viewBox: VB });
+    var board = h('div', { 'class': 'board' }); board.appendChild(svg);
+    var msg = h('div', { 'class': 'msg' });
+    var inOp = null, inTotal = null;
+    var bAdd, bSub, b180, b90;
+    bAdd = h('button', { 'class': 'btn', text: '合起來（＋）', 'data-op': 'add', onclick: function () { inOp = 'add'; bAdd.classList.add('sel'); bSub.classList.remove('sel'); totalRow.hidden = true; } });
+    bSub = h('button', { 'class': 'btn', text: '從大角拿掉（－）', 'data-op': 'sub', onclick: function () { inOp = 'sub'; bSub.classList.add('sel'); bAdd.classList.remove('sel'); totalRow.hidden = !it.item.askTotal; } });
+    b180 = h('button', { 'class': 'btn', text: '一直線 180°', 'data-total': 180, onclick: function () { inTotal = 180; b180.classList.add('sel'); b90.classList.remove('sel'); } });
+    b90 = h('button', { 'class': 'btn', text: '直角 90°', 'data-total': 90, onclick: function () { inTotal = 90; b90.classList.add('sel'); b180.classList.remove('sel'); } });
+    var totalRow = h('div', { 'class': 'row', hidden: 'hidden' }, [h('span', { text: '大角是' }), b180, b90]);
+    var inp = h('input', { 'class': 'num', type: 'number', inputmode: 'numeric', 'data-f': 'ans' });
+    var btns = h('div', { 'class': 'row' });
+    stage.appendChild(h('div', { 'class': 'stage' }, [board, h('div', { 'class': 'side' }, [
+      h('h2', { text: it.src }), h('div', { 'class': 'q', text: it.q }),
+      h('div', { 'class': 'row' }, [bAdd, bSub]), totalRow,
+      h('div', { 'class': 'row' }, [h('span', { text: '答案' }), inp, h('span', { text: '度' })]), btns, msg])]));
+    drawItem(svg, it);
+    btns.appendChild(h('button', { 'class': 'btn primary', text: '確定', 'data-act': 'check', onclick: function () {
+      var v = parseInt(inp.value, 10);
+      if (!inOp) { UI.say(msg, '先選是「合起來」還是「從大角拿掉」。', 'bad'); return; }
+      if (inOp === 'sub' && it.item.askTotal && !inTotal) { UI.say(msg, '大角是一直線還是直角？', 'bad'); return; }
+      if (isNaN(v)) { UI.say(msg, '填上答案。', 'bad'); return; }
+      var r = C.diagnoseCompose({ inOp: inOp, inTotal: inOp === 'sub' ? inTotal : undefined, answer: v, item: it.item });
+      var msgs = [];
+      if (r.op === 'WRONG_OP') msgs.push(MSG.WRONG_OP);
+      if (r.total === 'WRONG_TOTAL') msgs.push(MSG.WRONG_TOTAL);
+      if (r.answer !== 'CORRECT' && !msgs.length) msgs.push(MSG[r.answer]);
+      if (msgs.length) { UI.say(msg, msgs.join(''), 'bad'); return; }
+      UI.say(msg, '答對了！' + it.expr + '＝' + r.correct + '°', 'ok');
+      api.pass();
+      btns.innerHTML = '';
+      btns.appendChild(h('button', { 'class': 'btn primary', 'data-act': 'next', text: '下一題', onclick: api.next }));
+    } }));
+  }
+
+  /* ================================================================
+   * 🏆 挑戰
+   * ============================================================== */
+  (function () {
+    var q = { id: '112-15', img: 'img/112_4_q15.png', answer: 4,
+      why: 'ㄅ角是由左邊三角板的 60° 角，和右邊三角板的直角 90° 拼起來的：60°＋90°＝150°。' };
+    var box = document.getElementById('chBox'), msg = h('div', { 'class': 'msg' }), row = h('div', { 'class': 'row' });
+    [1, 2, 3, 4].forEach(function (n) {
+      row.appendChild(h('button', { 'class': 'btn', text: '①②③④'.charAt(n - 1), 'data-opt': n, onclick: function () {
+        UI.say(msg, n === q.answer ? '答對了！' + q.why : '再想想看：ㄅ角是哪兩個三角板的哪兩個角拼起來的？', n === q.answer ? 'ok' : 'bad');
+      } }));
+    });
+    box.appendChild(h('div', { 'class': 'side', 'data-q': q.id }, [
+      h('h2', { text: q.id + ' 學力檢測' }),
+      h('p', { 'class': 'warn', text: '與第六單元「三角形」共用，老師可自行決定放在哪個單元。' }),
+      h('img', { src: q.img, alt: q.id + ' 原題', style: 'max-width:100%' }), row, msg]));
+    box.appendChild(h('p', { 'class': 'src', text: '大於 180° 的旋轉角（112-25）在「活動三 旋轉角」的挑戰分頁。' }));
+  })();
+
+  UI.tabs();
+  showExplore(0);
+})();
+</script>
+</body>
+</html>
