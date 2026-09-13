@@ -1,8 +1,10 @@
 # handoff — 量角器與角度
 
 ## 目前狀態
-- v1.0：`index.html`＋`act1`～`act4` 四頁完成，本機 commit 2 筆（`d78d2db`、`50a3f03`）
-- **部署卡住**：這台電腦沒有 GitHub CLI（`gh`），無法由指令建立 repo；本地 repo 尚無 remote
+- v1.0：`index.html`＋`act1`～`act4` 四頁**已部署**
+- GitHub：https://github.com/wukolo1206/angle-protractor
+- 網址：https://wukolo1206.github.io/angle-protractor/
+- 2026-09-13 安裝 GitHub CLI（`C:\Program Files\GitHub CLI\gh.exe`）並登入 wukolo1206，用 `gh repo create` 建 repo、`gh api` 開 Pages
 - 設計規格 v1.2：`../docs/superpowers/specs/2026-09-13-u3-angle-design.md`
 - 已同步：`../專案總表.md`、`../CLAUDE.md` 子工具一覽、`knowledge-map/data/units.json` 的 `tools`、`../docs/互動教具設計流程.md`（U3 心得）
 

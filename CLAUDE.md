@@ -1,10 +1,10 @@
 ---
 project: 量角器與角度（四上第三單元）
 category: 學科工具集
-status: 開發中
-version: "v1.0 四頁完成，run-tests 全過，本機已 commit，尚未部署"
-url: "—"
-next_action: 在 GitHub 網頁建空 repo angle-protractor 後 push 並開 Pages（本機無 gh）；iPad 實機試用調整對齊容差
+status: 已部署
+version: "v1.0 四頁上線（GitHub Pages），run-tests 全過"
+url: https://wukolo1206.github.io/angle-protractor/
+next_action: iPad 實機試用：拖量角器中心容差 3% 是否太嚴、圓環與竹籤拖曳手感；課堂試教收回饋
 updated: 2026-09-13
 ---
 
