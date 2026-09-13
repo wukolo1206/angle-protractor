@@ -19,6 +19,10 @@
 
 * { box-sizing: border-box; }
 
+/* 有 hidden 屬性一律隱藏：.row／.reward-banner 等設了 display 會蓋掉瀏覽器預設的 [hidden]，
+   導致「應該先藏起來」的區塊一開始就出現（e2e 抓到過關橫幅、act2 原因按鈕、act4 總量選項） */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   background: var(--bg);
@@ -133,3 +137,34 @@ input.num.badf { border-color: var(--bad); background: var(--bad-bg); }
 .clock-start { stroke: #d32f2f; stroke-width: 3; stroke-dasharray: 6 5; }
 .turn-arc { fill: none; stroke: #d32f2f; stroke-width: 3; }
 .lens-ring { fill: none; stroke: #263238; stroke-width: 2; }
+
+/* 過關打勾與獎勵畫面 */
+.levels button.done::before { content: '✓ '; color: var(--ok); font-weight: 700; }
+.reward-banner {
+  display: block; width: 100%; min-height: 52px; margin: 6px 0 4px; padding: 8px 14px;
+  border-radius: 14px; border: 2px solid #f9a825; background: #fff8e1; color: #6d4c00;
+  font-size: 1.05rem; font-weight: 700; text-align: left; cursor: pointer;
+}
+.reward {
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 1000;
+  background: rgba(38, 50, 56, .55); display: flex; align-items: center; justify-content: center;
+  padding: 16px; overflow: hidden;
+}
+.reward-card {
+  position: relative; background: #fff; border-radius: 24px; padding: 28px 24px 20px;
+  max-width: 560px; width: 100%; text-align: center; box-shadow: 0 18px 50px rgba(0, 0, 0, .3);
+  animation: reward-pop .5s cubic-bezier(.2, 1.4, .4, 1) both;
+}
+.reward-trophy { font-size: 96px; line-height: 1.1; animation: reward-bounce 1.2s ease-in-out infinite; }
+.reward-title { font-size: 1.2rem; color: var(--muted); margin-top: 6px; }
+.reward-big { font-size: 2.2rem; font-weight: 800; color: var(--accent); margin: 6px 0; }
+.reward-stars { font-size: 2.4rem; letter-spacing: 6px; }
+.reward-meta { font-size: 1rem; color: var(--ink); margin: 10px 0 6px; }
+.confetti span { position: absolute; top: -40px; font-size: 34px; animation: confetti-fall 2.6s linear infinite; }
+@keyframes reward-pop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes reward-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+@keyframes confetti-fall { to { transform: translateY(110vh) rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .reward-card, .reward-trophy { animation: none; }
+  .confetti { display: none; }
+}

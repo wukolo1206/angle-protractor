@@ -110,10 +110,22 @@
     } });
     function draw() {
       AP.clear(layer);
-      AP.wedge(layer, V.x, V.y, 0, A, L - 20, 'wedge').setAttribute('fill', COLORS[0]);
-      var w = AP.wedge(layer, V.x, V.y, s, s + B, L - 60, 'wedge'); w.setAttribute('fill', COLORS[1]);
+      // 顏色用 style.fill：.wedge 的 CSS fill 會蓋掉 fill 屬性，原本兩個角都顯示成淺藍
+      AP.wedge(layer, V.x, V.y, 0, A, L - 20, 'wedge').style.fill = COLORS[0];
+      AP.wedge(layer, V.x, V.y, s, s + B, L - 60, 'wedge').style.fill = COLORS[1];
       line(layer, 0); line(layer, A);
       AP.ray(layer, V.x, V.y, s, L - 60, 'ray2'); AP.ray(layer, V.x, V.y, s + B, L - 60, 'ray2');
+      // 圖形裡寫上目前選定的角度（第二個角的字放在把手內側，避免被把手蓋住）
+      labelAt(layer, A / 2, (L - 20) * 0.62, A + '°', '#33691e');
+      labelAt(layer, s + B / 2, (L - 60) * 0.4, B + '°', '#1b5e20');
+      if (s === A) {
+        arcMark(layer, 0, A + B, L + 6, '#d32f2f');
+        labelAt(layer, (A + B) / 2, L + 30, (A + B) + '°', '#d32f2f');
+      } else if (s === 0 && A !== B) {
+        var lo = Math.min(A, B), hi = Math.max(A, B);
+        arcMark(layer, lo, hi, (hi === A ? L - 20 : L - 60) - 8, '#d32f2f');
+        labelAt(layer, (lo + hi) / 2, (hi === A ? L - 20 : L - 60) + 18, (hi - lo) + '°', '#d32f2f');
+      }
       var hp = AP.pt(s + B / 2, (L - 60) * 0.7);
       hd.setAttribute('cx', V.x + hp.x); hd.setAttribute('cy', V.y + hp.y);
       if (s === A) UI.say(exMsg, '拼在旁邊，合起來：' + A + '°＋' + B + '°＝' + (A + B) + '°', 'ok');
@@ -153,7 +165,7 @@
       var parts = [];
       for (var i = 0; i < edges.length - 1; i++) {
         var a = edges[i], b = edges[i + 1];
-        AP.wedge(layer, V.x, V.y, a, b, 90 + 20 * i, 'wedge').setAttribute('fill', COLORS[i % 3]);
+        AP.wedge(layer, V.x, V.y, a, b, 90 + 20 * i, 'wedge').style.fill = COLORS[i % 3];
         labelAt(layer, (a + b) / 2, 140 + 20 * i, (b - a) + '°');
         parts.push(b - a);
       }

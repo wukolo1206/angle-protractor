@@ -66,6 +66,12 @@
     var n = UI.laterCount();
     var el = document.getElementById('later');
     if (n > 0) { el.hidden = false; el.textContent = '還有 ' + n + ' 張課堂實作卡選了「稍後在課堂做」。'; }
+    // 練習全部過關的活動，卡片標題加上 🏆
+    ['act1', 'act2', 'act3', 'act4'].forEach(function (k) {
+      if (!UI.rewardTime(k)) return;
+      var a = document.querySelector('a.card[href="' + k + '.html"] h2');
+      if (a) a.appendChild(UI.h('span', { 'class': 'trophy', text: ' 🏆', title: '練習全部過關' }));
+    });
   })();
 </script>
 </body>

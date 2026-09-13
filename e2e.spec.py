@@ -143,6 +143,9 @@ def run(pg):
     pg.click('#lvStage [data-act=later]')
     ck(pg.evaluate("document.querySelector('#lvNav button.on').dataset.level") == 'l4', '按「稍後在課堂做」後進下一關')
 
+    pg.click('button[data-level=l4]')
+    ck(not pg.is_visible('#lvStage [data-reason]'), '量法對嗎：選「不正確」之前不顯示原因按鈕（hidden 不可被 .row 蓋掉）')
+
     pg.click('button[data-level=l5]')
     pt = to_client(pg, '#lvStage svg', 320 + 230 * math.cos(math.radians(115)), 400 - 230 * math.sin(math.radians(115)))
     pg.mouse.click(pt[0], pt[1])
@@ -205,6 +208,10 @@ def run(pg):
     after = pg.inner_text('#exMsg')
     ck(after != before and '45°＋60°＝105°' in after, '拖動三角板，算式即時更新')
     pg.click('button[data-tab=practice]')
+    pg.click('button[data-level="p45-2"]')
+    ck(not pg.is_visible('#lvStage [data-total="180"]'), '問2：選「從大角拿掉」之前不顯示總量選項')
+    pg.click('#lvStage [data-op=sub]')
+    ck(pg.is_visible('#lvStage [data-total="180"]'), '問2：選「從大角拿掉」之後才顯示總量選項')
 
     def compose(level, op, total, v):
         pg.click('button[data-level="%s"]' % level)
@@ -217,6 +224,34 @@ def run(pg):
     ck('97°' in compose('p46-1', 'add', None, 97), '練習百分百③① 40＋57＝97')
     ck('另一個角' in compose('p46-2', 'sub', 180, 125), '練習百分百③② 答 125 → 漏扣一個角')
     ck('直線' in compose('p45-2', 'sub', 90, 60), '問2 選直角 → WRONG_TOTAL')
+
+    # ── 過關打勾與獎勵畫面（用活動四：10 關、答案都是課本標準答案） ──
+    print('== 過關打勾與獎勵')
+    answers = [('p44-1', 'add', None, 105), ('p44-2', 'sub', None, 15), ('p44-d1', 'add', None, 133),
+               ('p44-d2', 'sub', None, 50), ('p45-2', 'sub', 180, 60), ('p45-3', 'sub', 90, 56),
+               ('p45-d1', 'sub', 180, 105), ('p45-d2', 'sub', 90, 20), ('p46-1', 'add', None, 97),
+               ('p46-2', 'sub', 180, 70)]
+    ck(not pg.is_visible('[data-act=reward-banner]'), '還沒全部過關時沒有過關橫幅')
+    for lv, op, total, v in answers[:-1]:
+        compose(lv, op, total, v)
+    ck(not pg.is_visible('.reward'), '還差一關時沒有獎勵畫面')
+    ck(pg.eval_on_selector_all('#lvNav button.done', 'e=>e.length') == 9, '答對的 9 關都打勾')
+    chip = pg.evaluate('''()=>getComputedStyle(document.querySelector('#lvNav button.done'),'::before').content''')
+    ck('✓' in chip, '打勾符號顯示在關卡按鈕上')
+    compose(*answers[-1])
+    rw = pg.inner_text('.reward') if pg.is_visible('.reward') else ''
+    ck('全部過關' in rw and '活動四' in rw and '10 關' in rw, '10 關全對 → 出現活動四獎勵畫面（含關數與完成時間）')
+    pg.click('[data-act=reward-close]')
+    ck(not pg.is_visible('.reward') and pg.is_visible('[data-act=reward-banner]'), '關閉獎勵後上方保留「全部過關」橫幅')
+    pg.click('[data-act=reward-banner]')
+    ck(pg.is_visible('.reward'), '點橫幅可再打開獎勵畫面')
+    pg.click('[data-act=reward-close]')
+    pg.reload(); pg.wait_for_load_state('networkidle'); pg.click('button[data-tab=practice]')
+    ck(pg.eval_on_selector_all('#lvNav button.done', 'e=>e.length') == 10 and pg.is_visible('[data-act=reward-banner]'),
+       '重新整理後打勾與過關橫幅都還在')
+    pg.goto(BASE + 'index.html'); pg.wait_for_load_state('networkidle')
+    ck(pg.is_visible('a.card[href="act4.html"] .trophy'), '首頁活動四卡片顯示 🏆')
+    ck(not pg.is_visible('a.card[href="act1.html"] .trophy'), '首頁活動一沒有 🏆（尚未全部過關）')
 
 
 def main():
