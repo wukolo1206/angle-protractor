@@ -129,6 +129,64 @@ def run(pg):
     t = pg.inner_text('#exMsg')
     ck('∠2 差 4°' in t and '再一起量一次' in t and '∠1 差' not in t, '附件7：兩人差超過 2° 的角才提醒再一起量')
 
+    # 探索：問4 三角板 6 個角
+    pg.click('button[data-ex=e-sq]')
+    ck('現在量 ∠1' in pg.inner_text('#exText'), '探索三角板：一次亮一個角，從 ∠1 開始')
+    pg.fill('#exCtrl input[data-f=ans]', '150'); pg.click('#exCtrl [data-act=check]')
+    ck('比直角（90°）大還是小' in pg.inner_text('#exMsg'), '探索三角板：∠1 填 150 → 讀錯圈提示')
+    for n, d in [(1, 31), (2, 60), (3, 90), (4, 45), (5, 89), (6, 45)]:
+        pg.wait_for_selector('#exCtrl [data-act=check]:not([disabled])')
+        ck(('現在量 ∠%d' % n) in pg.inner_text('#exText'), '探索三角板：輪到 ∠%d' % n)
+        pg.fill('#exCtrl input[data-f=ans]', str(d)); pg.click('#exCtrl [data-act=check]')
+        pg.wait_for_timeout(850)
+    ck('都量好了' in pg.inner_text('#exText'), '探索三角板：6 個角量完進入兩個小題')
+    vals = pg.eval_on_selector_all('#exSvg [data-val]', 'e=>e.map(x=>x.textContent)')
+    ck(vals == ['30°', '60°', '90°', '45°', '90°', '45°'], '探索三角板：答案方框填入課本標準值')
+    pg.fill('#exCtrl input[data-f=q1]', '90')
+    pg.click('#exCtrl [data-pick="4"]'); pg.click('#exCtrl [data-pick="2"]')
+    pg.fill('#exCtrl input[data-f=q2]', '45'); pg.click('#exCtrl [data-act=check2]')
+    ck('哪兩個一樣' in pg.inner_text('#exMsg'), '探索三角板②：選 ∠4、∠2 → 提示')
+    pg.click('#exCtrl [data-pick="2"]'); pg.click('#exCtrl [data-pick="6"]')
+    pg.click('#exCtrl [data-act=check2]')
+    ck('都是 45°' in pg.inner_text('#exMsg'), '探索三角板②：選 ∠4、∠6、45 度 → 答對')
+
+    # 探索：問6 量角再分類
+    pg.click('button[data-ex=e-cls]')
+    ck('現在量 ∠1' in pg.inner_text('#exText'), '探索分類：一次量一個角，從 ∠1 開始')
+    ck(not pg.is_visible('#exSvg [data-bin=eq]'), '探索分類：量完之前不顯示分類格子')
+    for n, d in [(1, 90), (2, 69), (3, 125), (4, 101), (5, 90), (6, 25)]:
+        pg.wait_for_selector('#exCtrl [data-act=check]:not([disabled])')
+        pg.fill('#exCtrl input[data-f=ans]', str(d)); pg.click('#exCtrl [data-act=check]')
+        pg.wait_for_timeout(850)
+    ck('拖到正確的格子' in pg.inner_text('#exText'), '探索分類：6 個角量完進入拖放分類')
+    vals = pg.eval_on_selector_all('#exSvg [data-val]', 'e=>e.map(x=>x.textContent)')
+    ck(vals == ['90°', '70°', '125°', '100°', '90°', '25°'], '探索分類：角旁寫上課本圖量得的度數')
+
+    def tap_angle(n):
+        c = center_of(pg, '#exSvg [data-angle="%d"] line' % n)
+        pg.mouse.click(c[0], c[1]); pg.wait_for_timeout(100)
+
+    def tap_bin(key):
+        c = center_of(pg, '#exSvg [data-bin=%s]' % key)
+        pg.mouse.click(c[0], c[1]); pg.wait_for_timeout(150)
+
+    tap_angle(3); tap_bin('lt')
+    ck('再放一次' in pg.inner_text('#exMsg'), '探索分類：∠3（125°）放到「小於 90°」→ 退回並提示')
+    tap_angle(3); tap_bin('gt')
+    ck('鈍角' in pg.inner_text('#exMsg'), '探索分類：∠3 放到「大於 90°」→ 鈍角')
+    a6 = center_of(pg, '#exSvg [data-angle="6"] line')
+    b_lt = center_of(pg, '#exSvg [data-bin=lt]')
+    drag(pg, a6, b_lt, 12); pg.wait_for_timeout(150)
+    ck('銳角' in pg.inner_text('#exMsg'), '探索分類：拖曳 ∠6 到「小於 90°」→ 銳角')
+    for n, key in [(1, 'eq'), (2, 'lt'), (4, 'gt'), (5, 'eq')]:
+        tap_angle(n); tap_bin(key)
+    pg.wait_for_timeout(1100)
+    ck(pg.is_visible('#exCtrl [data-tf="1-x"]'), '探索分類：6 個角放完進入做做看')
+    pg.click('#exCtrl [data-tf="1-o"]')
+    ck('直角是幾度' in pg.inner_text('#exMsg'), '做做看①：「比 90 度小的角稱為直角」選 ○ → 提示')
+    pg.click('#exCtrl [data-tf="1-x"]'); pg.click('#exCtrl [data-tf="2-o"]')
+    ck('掌握了' in pg.inner_text('#exMsg'), '做做看：兩題答對')
+
     # 探索：畫角步驟（問9）
     pg.click('button[data-ex=e-draw]')
     ck('做一個記號' in pg.inner_text('#exCtrl') and '連成一直線' in pg.inner_text('#exCtrl'), '畫角：右側列出課本四個步驟')
@@ -141,6 +199,18 @@ def run(pg):
       const d=Math.abs(((f('#exSvg line[data-drawn]')-f('#exSvg line[data-base]'))%360+540)%360-180);return d;}''')
     ck(abs(ang - target) <= 1, '畫角：步驟④畫出的角等於題目度數（%s° vs %s°）' % (round(ang, 1), target))
     ck('連成一直線' in pg.inner_text('#exMsg'), '畫角：步驟④說明拿開量角器、連成一直線')
+
+    # 探索：練習百分百第 1 題（印p46）
+    pg.click('button[data-ex=e-p46]')
+    ck('練習百分百' in pg.inner_text('#exTitle'), '探索：切換到練習百分百第1題')
+    pg.fill('#exCtrl input[data-f=deg1]', '90')
+    pg.click('#exCtrl [data-type="1-直角"]')
+    pg.fill('#exCtrl input[data-f=deg2]', '135')
+    pg.click('#exCtrl [data-type="2-鈍角"]')
+    pg.fill('#exCtrl input[data-f=deg3]', '40')
+    pg.click('#exCtrl [data-type="3-銳角"]')
+    pg.click('#exCtrl [data-act=check-p46]')
+    ck('全部答對' in pg.inner_text('#exMsg'), '練習百分百第1題：輸入度數並選擇角的種類，檢查通過')
     pg.click('button[data-tab=practice]'); pg.click('button[data-level=l2]')
     ck(pg.is_disabled('#lvStage input[data-f=ans]'), '自己量：擺好前讀數格停用')
     ring_r = pg.evaluate('''()=>{const d=document.querySelector('#lvStage .ring-handle').getAttribute('d');return +d.split(' A ')[1].split(' ')[0];}''')
@@ -182,73 +252,8 @@ def run(pg):
         drag(pg, frm, to)
     ck(not pg.is_disabled('#lvStage input[data-f=ans]'), '邊太短：延長後讀數格解鎖')
 
-    pg.click('button[data-level=c-p46]')
-    ck(pg.is_visible('#lvStage [data-card="act2-p46-1"]'), '練習百分百第1題 顯示課堂實作卡')
-    ck(pg.evaluate("document.querySelector('#lvNav button.on').dataset.level") == 'c-p46', '實作卡未按鈕前停在該關')
-    pg.click('#lvStage [data-act=later]')
-    ck('later' in (pg.get_attribute('button[data-level=c-p46]', 'class') or ''), '按「稍後在課堂做」後關卡標為稍後')
-
     pg.click('button[data-level=l4]')
     ck(not pg.is_visible('#lvStage [data-reason]'), '量法對嗎：選「不正確」之前不顯示原因按鈕（hidden 不可被 .row 蓋掉）')
-
-    # 問4 三角板 6 個角：一次量一個、實測後填答
-    pg.click('button[data-level=l-sq]')
-    ck('現在量 ∠1' in pg.inner_text('#lvStage .q'), '三角板：一次亮一個角，從 ∠1 開始')
-    pg.fill('#lvStage input[data-f=ans]', '150'); pg.click('#lvStage [data-act=check]')
-    ck('比直角（90°）大還是小' in msg(pg), '三角板：∠1 填 150 → 讀錯圈提示')
-    for n, d in [(1, 31), (2, 60), (3, 90), (4, 45), (5, 89), (6, 45)]:
-        pg.wait_for_selector('#lvStage [data-act=check]:not([disabled])')
-        ck(('現在量 ∠%d' % n) in pg.inner_text('#lvStage .q'), '三角板：輪到 ∠%d' % n)
-        pg.fill('#lvStage input[data-f=ans]', str(d)); pg.click('#lvStage [data-act=check]')
-        pg.wait_for_timeout(850)
-    ck('都量好了' in pg.inner_text('#lvStage .q'), '三角板：6 個角量完（31、89 在 2° 誤差內算對）進入兩個小題')
-    vals = pg.eval_on_selector_all('#lvStage svg [data-val]', 'e=>e.map(x=>x.textContent)')
-    ck(vals == ['30°', '60°', '90°', '45°', '90°', '45°'], '三角板：答案方框填入課本標準值')
-    pg.fill('#lvStage input[data-f=q1]', '90')
-    pg.click('#lvStage [data-pick="4"]'); pg.click('#lvStage [data-pick="2"]')
-    pg.fill('#lvStage input[data-f=q2]', '45'); pg.click('#lvStage [data-act=check2]')
-    ck('哪兩個一樣' in msg(pg), '三角板②：選 ∠4、∠2 → 提示')
-    pg.click('#lvStage [data-pick="2"]'); pg.click('#lvStage [data-pick="6"]')
-    pg.click('#lvStage [data-act=check2]')
-    ck('都是 45°' in msg(pg), '三角板②：選 ∠4、∠6、45 度 → 答對')
-
-    # 問6 量課本圖的角 → 分類拖放 → 做做看
-    pg.click('button[data-level=l-cls]')
-    ck('現在量 ∠1' in pg.inner_text('#lvStage .q'), '分類：一次量一個角，從 ∠1 開始')
-    ck(not pg.is_visible('#lvStage [data-bin=eq]'), '分類：量完之前不顯示分類格子')
-    for n, d in [(1, 90), (2, 69), (3, 125), (4, 101), (5, 90), (6, 25)]:
-        pg.wait_for_selector('#lvStage [data-act=check]:not([disabled])')
-        pg.fill('#lvStage input[data-f=ans]', str(d)); pg.click('#lvStage [data-act=check]')
-        pg.wait_for_timeout(850)
-    ck('拖到正確的格子' in pg.inner_text('#lvStage .q'), '分類：6 個角量完進入拖放分類')
-    vals = pg.eval_on_selector_all('#lvStage svg [data-val]', 'e=>e.map(x=>x.textContent)')
-    ck(vals == ['90°', '70°', '125°', '100°', '90°', '25°'], '分類：角旁寫上課本圖量得的度數')
-
-    def tap_angle(n):
-        c = center_of(pg, '#lvStage svg [data-angle="%d"] line' % n)
-        pg.mouse.click(c[0], c[1]); pg.wait_for_timeout(100)
-
-    def tap_bin(key):
-        c = center_of(pg, '#lvStage svg [data-bin=%s]' % key)
-        pg.mouse.click(c[0], c[1]); pg.wait_for_timeout(150)
-
-    tap_angle(3); tap_bin('lt')
-    ck('再放一次' in msg(pg), '分類：∠3（125°）放到「小於 90°」→ 退回並提示')
-    tap_angle(3); tap_bin('gt')
-    ck('鈍角' in msg(pg), '分類：∠3 放到「大於 90°」→ 鈍角')
-    # 真的拖曳一次：∠6 拖到「小於 90°」
-    a6 = center_of(pg, '#lvStage svg [data-angle="6"] line')
-    b_lt = center_of(pg, '#lvStage svg [data-bin=lt]')
-    drag(pg, a6, b_lt, 12); pg.wait_for_timeout(150)
-    ck('銳角' in msg(pg), '分類：拖曳 ∠6 到「小於 90°」→ 銳角')
-    for n, key in [(1, 'eq'), (2, 'lt'), (4, 'gt'), (5, 'eq')]:
-        tap_angle(n); tap_bin(key)
-    pg.wait_for_timeout(1100)
-    ck(pg.is_visible('#lvStage [data-tf="1-x"]'), '分類：6 個角放完進入做做看')
-    pg.click('#lvStage [data-tf="1-o"]')
-    ck('直角是幾度' in msg(pg), '做做看①：「比 90 度小的角稱為直角」選 ○ → 提示')
-    pg.click('#lvStage [data-tf="1-x"]'); pg.click('#lvStage [data-tf="2-o"]')
-    ck('鈍角' in msg(pg) and pg.is_visible('#lvStage [data-act=next]'), '做做看：兩題答對 → 本關完成')
 
     # 問8 拼平角：自由移動，找 2 種拼法過關
     pg.click('button[data-level=l-flat]')

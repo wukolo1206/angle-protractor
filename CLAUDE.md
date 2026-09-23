@@ -2,10 +2,10 @@
 project: 量角器與角度（四上第三單元）
 category: 學科工具集
 status: 開發中
-version: "v1.5.0 活動二量角再分類／拼平角／畫角步驟上線；過關打勾與獎勵畫面；已加入 Vibe Coding 資源庫"
+version: "v1.6.0 活動二三角板、量角再分類與練習百分百第1題移至探索"
 url: https://wukolo1206.github.io/angle-protractor/
-next_action: iPad 實機試用（擺量角器中心容差 3%、拼平角與分類拖曳手感）；活動一、三、四比照活動二檢視課堂實作卡與探索是否要擴充
-updated: 2026-09-13
+next_action: 測試活動二探索新功能（三角板、量角再分類、練習百分百第1題）並確認 iPad 觸控手感
+updated: 2026-09-23
 ---
 
 # CLAUDE.md — 量角器與角度
