@@ -56,23 +56,50 @@
   var RING = { outer: '外圈（黑字）', inner: '內圈（紅字）' };
 
   function rint(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
+  function animate(ms, step, done) {
+    var t0 = null;
+    function f(t) {
+      if (t0 === null) t0 = t;
+      var k = Math.min(1, (t - t0) / ms);
+      step(k);
+      if (k < 1) requestAnimationFrame(f);
+      else if (done) done();
+    }
+    requestAnimationFrame(f);
+  }
 
-  function addArrowDefs(svg) {
-    var defs = AP.el('defs', {}, svg);
-    var m = AP.el('marker', { id: svg.id ? svg.id + '-arrow' : 'arrow-' + Math.random().toString(36).slice(2), viewBox: '0 0 10 10', refX: 5, refY: 5, markerWidth: 6, markerHeight: 6, orient: 'auto-start-reverse' }, defs);
-    AP.el('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: '#d32f2f' }, m);
-    return m.getAttribute('id');
+  function addArrowDefs(svg, color) {
+    color = color || '#d32f2f';
+    var defs = svg.querySelector('defs');
+    if (!defs) defs = AP.el('defs', {}, svg);
+    var hex = color.replace('#', '');
+    var uid = (svg.id ? svg.id : 'ap') + '-arrow-' + hex;
+    var existing = svg.querySelector('#' + uid);
+    if (existing) return uid;
+    var m = AP.el('marker', { id: uid, viewBox: '0 0 10 10', refX: 5, refY: 5, markerWidth: 6, markerHeight: 6, orient: 'auto-start-reverse' }, defs);
+    AP.el('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: color }, m);
+    return uid;
   }
 
   /* 畫一個鐘面題：從 from 轉到 to（方向 dir），回傳 group */
   function drawClockTurn(svg, cx, cy, r, from, to, dir, opt) {
     opt = opt || {};
-    var arrowId = addArrowDefs(svg);
+    var color = opt.color || (dir === 'ccw' ? '#1565c0' : '#d32f2f');
+    var arrowId = addArrowDefs(svg, color);
     var g = AP.drawClock(svg, cx, cy, r);
     var s = AP.pt(AP.numberAngle(from), r * 0.62);
     AP.el('line', { x1: 0, y1: 0, x2: s.x, y2: s.y, 'class': 'clock-start' }, g);
     var steps = C.clockTurn(from, to, dir).steps;
-    if (!opt.noArc) AP.el('path', { d: AP.clockArcPath(from, dir, steps, r * 0.36), 'class': 'turn-arc', 'marker-end': 'url(#' + arrowId + ')' }, g);
+    if (!opt.noArc) {
+      var cls = 'turn-arc' + (dir === 'ccw' ? ' turn-arc-ccw' : '');
+      var arcAttrs = {
+        d: AP.clockArcPath(from, dir, steps, opt.arcRadius || (r * 0.36)),
+        'class': cls,
+        'marker-end': 'url(#' + arrowId + ')'
+      };
+      if (color) arcAttrs.style = 'stroke: ' + color + ';';
+      AP.el('path', arcAttrs, g);
+    }
     var e = AP.pt(AP.numberAngle(to), r * 0.62);
     var hand = AP.el('line', { x1: 0, y1: 0, x2: e.x, y2: e.y, 'class': 'clock-hand' }, g);
     g.hand = hand; g.r = r; g.arrowId = arrowId;
@@ -137,6 +164,11 @@
       var span = Math.abs(a) >= 360 ? (a > 0 ? 359.5 : -359.5) : a;
       arc.setAttribute('d', AP.arcPath(AP.numberAngle(start), AP.numberAngle(start) + span, r * 0.36));
       var dir = a < 0 ? 'cw' : 'ccw', deg = Math.round(Math.abs(a));
+      var col = dir === 'ccw' ? '#1565c0' : '#d32f2f';
+      var aid = addArrowDefs(exSvg, col);
+      arc.setAttribute('marker-end', 'url(#' + aid + ')');
+      arc.setAttribute('class', 'turn-arc' + (dir === 'ccw' ? ' turn-arc-ccw' : ''));
+      arc.style.stroke = col;
       var text = '往' + DIR[dir] + '方向旋轉' + (deg % 30 === 0 ? '，轉了 ' + deg / 30 + ' 大格，是 ' + deg + '°' : '');
       if (deg === 360) text += '，轉一圈是周角';
       UI.say(exMsg, text + '。', 'ok');
@@ -152,19 +184,120 @@
   // E2 問3–4 印p42
   function exStep() {
     exTitle.textContent = '一大格是幾度？';
-    exText.textContent = '指針從 12 開始往順時針方向轉，一次轉一大格。';
-    var n = 0, g;
+    var n = 0, dir = 'cw', showDiv = false;
+    var bCw, bCcw, bStep, bDiv, bReset;
+
     function draw() {
       AP.clear(exSvg);
-      g = drawClockTurn(exSvg, 320, 240, 200, 12, n === 0 ? 12 : n % 12 === 0 ? 12 : n % 12, 'cw', { noArc: n === 0 });
-      if (n === 0) { UI.say(exMsg, '按「轉一大格」。'); return; }
-      var list = []; for (var i = 1; i <= n; i++) list.push(i * 30 + '°');
-      var t = '轉了 ' + n + ' 大格：' + list.join('、');
-      if (n === 12) t += '。指針轉一圈是轉了 360 度，我們稱 360 度的角是周角。';
+      exText.textContent = '指針從 12 開始往' + DIR[dir] + '方向轉，一次轉一大格。';
+      var to = n === 0 ? 12 : (dir === 'cw' ? (n % 12 || 12) : ((12 - n % 12) % 12 || 12));
+      var color = dir === 'ccw' ? '#1565c0' : '#d32f2f';
+      var g = drawClockTurn(exSvg, 320, 240, 200, 12, to, dir, { noArc: n === 0, color: color });
+
+      // 若開啟「12 等分線」：在鐘面上繪製 12 條等分射線
+      if (showDiv) {
+        var divGroup = AP.el('g', { 'class': 'clock-div-lines' });
+        for (var i = 1; i <= 12; i++) {
+          var ang = AP.numberAngle(i);
+          var pOuter = AP.pt(ang, 192);
+          AP.el('line', {
+            x1: 0, y1: 0,
+            x2: pOuter.x, y2: pOuter.y,
+            stroke: '#0288d1',
+            'stroke-width': 1.6,
+            'stroke-dasharray': '5 4'
+          }, divGroup);
+        }
+        g.insertBefore(divGroup, g.firstChild ? g.firstChild.nextSibling : null);
+      }
+
+      // 若有旋轉，繪製扇形微透明底色加強視覺辨識
+      if (n > 0) {
+        var startAngle = AP.numberAngle(12);
+        var span = n * 30 * (dir === 'cw' ? -1 : 1);
+        if (Math.abs(span) >= 360) span = dir === 'cw' ? -359.5 : 359.5;
+        var wedgeEl = AP.el('path', {
+          d: AP.wedgePath(startAngle, startAngle + span, 192),
+          fill: dir === 'ccw' ? 'rgba(21, 101, 192, 0.10)' : 'rgba(211, 47, 47, 0.10)',
+          style: 'pointer-events: none;'
+        });
+        g.insertBefore(wedgeEl, g.firstChild ? g.firstChild.nextSibling : null);
+      }
+
+      if (n === 0) {
+        var msg0 = showDiv
+          ? '鐘面一圈 360° 平分成 12 份：360° ÷ 12 ＝ 30°（一大格是 30°）。請按「轉一大格」。'
+          : '按「轉一大格」；也可按「12 等分線」看 360° 分成 12 份。';
+        UI.say(exMsg, msg0);
+        return;
+      }
+
+      var list = [];
+      for (var j = 1; j <= n; j++) list.push(j * 30 + '°');
+      var t = '往' + DIR[dir] + '方向轉了 ' + n + ' 大格：' + list.join('、');
+      if (showDiv) {
+        t += '（' + n + ' × 30° ＝ ' + (n * 30) + '°）';
+      }
+      if (n === 12) {
+        t += '。指針轉一圈是轉了 360 度，我們稱 360 度的角是周角。';
+      }
       UI.say(exMsg, t, 'ok');
     }
-    var b = h('button', { 'class': 'btn primary', text: '轉一大格', 'data-act': 'step', onclick: function () { if (n < 12) { n++; draw(); } b.disabled = n >= 12; } });
-    exCtrl.appendChild(h('div', { 'class': 'row' }, [b, h('button', { 'class': 'btn', text: '重來', onclick: function () { n = 0; b.disabled = false; draw(); } })]));
+
+    function setDir(d) {
+      if (dir === d) return;
+      dir = d;
+      n = 0;
+      bCw.classList.toggle('sel', dir === 'cw');
+      bCcw.classList.toggle('sel', dir === 'ccw');
+      bStep.disabled = false;
+      draw();
+    }
+
+    bCw = h('button', { 'class': 'btn sel', text: '順時針', onclick: function () { setDir('cw'); } });
+    bCcw = h('button', { 'class': 'btn', text: '逆時針', onclick: function () { setDir('ccw'); } });
+
+    bStep = h('button', {
+      'class': 'btn primary',
+      text: '轉一大格',
+      'data-act': 'step',
+      onclick: function () {
+        if (n < 12) { n++; draw(); }
+        bStep.disabled = (n >= 12);
+      }
+    });
+
+    bDiv = h('button', {
+      'class': 'btn',
+      text: '12 等分線（360°÷12）',
+      onclick: function () {
+        showDiv = !showDiv;
+        bDiv.classList.toggle('sel', showDiv);
+        draw();
+      }
+    });
+
+    bReset = h('button', {
+      'class': 'btn',
+      text: '重來',
+      onclick: function () {
+        n = 0;
+        bStep.disabled = false;
+        draw();
+      }
+    });
+
+    exCtrl.appendChild(h('div', { 'class': 'row' }, [
+      h('span', { text: '方向：', style: 'font-weight: 600;' }),
+      bCw,
+      bCcw
+    ]));
+    exCtrl.appendChild(h('div', { 'class': 'row' }, [
+      bStep,
+      bDiv,
+      bReset
+    ]));
+
     draw();
   }
 
@@ -173,23 +306,72 @@
     exTitle.textContent = '同一個起點和終點，兩個方向';
     exText.textContent = '選起點和終點。紅色是順時針，藍色是逆時針。';
     var from = 9, to = 1;
+    var spFromVal, spToVal;
+
     function draw() {
       AP.clear(exSvg);
-      var id = addArrowDefs(exSvg);
+      var redArrow = addArrowDefs(exSvg, '#d32f2f');
+      var blueArrow = addArrowDefs(exSvg, '#1565c0');
       var g = AP.drawClock(exSvg, 320, 240, 200);
+
       var s = AP.pt(AP.numberAngle(from), 124), e = AP.pt(AP.numberAngle(to), 124);
       AP.el('line', { x1: 0, y1: 0, x2: s.x, y2: s.y, 'class': 'clock-start' }, g);
       AP.el('line', { x1: 0, y1: 0, x2: e.x, y2: e.y, 'class': 'clock-hand' }, g);
+
       var cw = C.clockTurn(from, to, 'cw'), ccw = C.clockTurn(from, to, 'ccw');
-      AP.el('path', { d: AP.clockArcPath(from, 'cw', cw.steps, 70), 'class': 'turn-arc', 'marker-end': 'url(#' + id + ')' }, g);
-      AP.el('path', { d: AP.clockArcPath(from, 'ccw', ccw.steps, 100), 'class': 'turn-arc', stroke: '#1565c0' }, g);
-      UI.say(exMsg, '從 ' + from + ' 到 ' + to + '：順時針轉 ' + cw.steps + ' 大格，是 ' + cw.degrees + '°；逆時針轉 ' + ccw.steps + ' 大格，是 ' + ccw.degrees + '°。', 'ok');
+
+      // 順時針弧：紅色，半徑 70，紅色箭頭
+      AP.el('path', {
+        d: AP.clockArcPath(from, 'cw', cw.steps, 70),
+        'class': 'turn-arc',
+        style: 'stroke: #d32f2f;',
+        'marker-end': 'url(#' + redArrow + ')'
+      }, g);
+
+      // 逆時針弧：藍色，半徑 100，藍色箭頭
+      AP.el('path', {
+        d: AP.clockArcPath(from, 'ccw', ccw.steps, 100),
+        'class': 'turn-arc turn-arc-ccw',
+        style: 'stroke: #1565c0;',
+        'marker-end': 'url(#' + blueArrow + ')'
+      }, g);
+
+      if (spFromVal) spFromVal.textContent = from;
+      if (spToVal) spToVal.textContent = to;
+
+      UI.say(exMsg, '從 ' + from + ' 到 ' + to + '：順時針轉 ' + cw.steps + ' 大格，是 ' + cw.degrees + '°；逆時針轉 ' + ccw.steps + ' 大格，是 ' + ccw.degrees + '°。（兩方向合起來是 ' + (cw.degrees + ccw.degrees) + '° 周角）', 'ok');
     }
+
     function spin(label, get, set) {
-      return h('div', { 'class': 'row' }, [h('span', { text: label }),
-        h('button', { 'class': 'btn', text: '－', onclick: function () { set((get() + 10) % 12 + 1); draw(); } }),
-        h('button', { 'class': 'btn', text: '＋', onclick: function () { set(get() % 12 + 1); draw(); } })]);
+      var valSpan = h('span', {
+        text: get(),
+        style: 'font-weight: 700; font-size: 1.25rem; min-width: 32px; text-align: center; display: inline-block; color: #00695c;'
+      });
+      if (label === '起點') spFromVal = valSpan;
+      else spToVal = valSpan;
+
+      return h('div', { 'class': 'row' }, [
+        h('span', { text: label + '：', style: 'min-width: 48px; font-weight: 600;' }),
+        valSpan,
+        h('button', {
+          'class': 'btn',
+          text: '－',
+          onclick: function () {
+            set((get() + 10) % 12 + 1);
+            draw();
+          }
+        }),
+        h('button', {
+          'class': 'btn',
+          text: '＋',
+          onclick: function () {
+            set(get() % 12 + 1);
+            draw();
+          }
+        })
+      ]);
     }
+
     exCtrl.appendChild(spin('起點', function () { return from; }, function (v) { from = v; }));
     exCtrl.appendChild(spin('終點', function () { return to; }, function (v) { to = v; }));
     draw();
@@ -365,7 +547,7 @@
     load();
   }
 
-  // 關6–8 竹籤：先預測再拖
+  // 關6–8 竹籤：先轉再看幾度
   function thetaOf(reading, style, ring) {
     return C.ringIncreasesWith(style, ring) === 'ccw' ? reading : 180 - reading;
   }
@@ -379,52 +561,159 @@
       var prot = AP.drawProtractor(ui.svg, { r: R, style: it.style }); AP.place(prot, V.x, V.y, 0);
       var trail = AP.el('g', {}, ui.svg);
       var stick = AP.ray(ui.svg, V.x, V.y, thetaOf(0, it.style, it.ring), R + 30, 'ray2');
-      var hd = AP.el('circle', { r: 26, 'class': 'handle', visibility: 'hidden' }, ui.svg);
+      var hd = AP.el('circle', { r: 26, 'class': 'handle', visibility: 'visible' }, ui.svg);
       var stepText = h('div', { 'class': 'q' });
+      var turnBtn = h('button', { 'class': 'btn primary' });
       var inp = num('ans');
-      var goBtn = h('button', { 'class': 'btn primary', text: '確定', 'data-act': 'check' });
+      var goBtn = h('button', { 'class': 'btn', text: '確定', 'data-act': 'check' });
+
       ui.inputs.appendChild(stepText);
-      ui.inputs.appendChild(h('div', { 'class': 'row' }, [h('span', { text: '竹籤會停在' + RING[it.ring] + '的' }), inp, h('span', { text: '度' })]));
+      ui.inputs.appendChild(h('div', { 'class': 'row' }, [turnBtn]));
+      ui.inputs.appendChild(h('div', { 'class': 'row' }, [
+        h('span', { text: '竹籤會停在' + RING[it.ring] + '的' }),
+        inp,
+        h('span', { text: '度' })
+      ]));
       ui.btns.appendChild(goBtn);
-      var dragOn = false, cur = thetaOf(0, it.style, it.ring), expect = null;
-      function setStick(t) { cur = t; AP.setRay(stick, V.x, V.y, t, R + 30); var e = AP.pt(t, R + 30); hd.setAttribute('cx', V.x + e.x); hd.setAttribute('cy', V.y + e.y); }
+
+      var cur = thetaOf(0, it.style, it.ring);
+      var hasTurned = false, targetPos = 0, targetTheta = 0, startTheta = 0;
+      var currentArc = null, expect = null;
+
+      function setStick(t) {
+        cur = t;
+        AP.setRay(stick, V.x, V.y, t, R + 30);
+        var e = AP.pt(t, R + 30);
+        hd.setAttribute('cx', V.x + e.x);
+        hd.setAttribute('cy', V.y + e.y);
+      }
       setStick(cur);
+
+      function doTurn() {
+        if (hasTurned) return;
+        var t = it.turns[stepI];
+        turnBtn.disabled = true;
+        var col = t.dir === 'ccw' ? '#1565c0' : '#d32f2f';
+        var aid = addArrowDefs(ui.svg, col);
+        if (currentArc && currentArc.parentNode) currentArc.parentNode.removeChild(currentArc);
+        currentArc = AP.el('path', {
+          'class': 'turn-arc' + (t.dir === 'ccw' ? ' turn-arc-ccw' : ''),
+          style: 'stroke: ' + col + '; stroke-width: 3.5;',
+          'marker-end': 'url(#' + aid + ')'
+        }, trail);
+
+        var spanTotal = (t.dir === 'cw' ? -1 : 1) * t.deg;
+        animate(550, function (k) {
+          var nowT = startTheta + spanTotal * k;
+          setStick(nowT);
+          currentArc.setAttribute('d', AP.arcPath(startTheta, nowT, R * 0.45));
+        }, function () {
+          setStick(targetTheta);
+          currentArc.setAttribute('d', AP.arcPath(startTheta, targetTheta, R * 0.45));
+          hasTurned = true;
+          turnBtn.textContent = '✓ 已轉動 ' + t.deg + '°';
+          goBtn.classList.add('primary');
+          inp.focus();
+          UI.say(ui.msg, '轉好了！請看量角器刻度，竹籤現在停在幾度？填入後按「確定」。');
+        });
+      }
+
       AP.drag(ui.svg, hd, {
-        move: function (p) { if (!dragOn) return; setStick(p.y > V.y ? (p.x < V.x ? 180 : 0) : Math.round(AP.angleAt(V.x, V.y, p.x, p.y))); },
+        move: function (p) {
+          setStick(p.y > V.y ? (p.x < V.x ? 180 : 0) : Math.round(AP.angleAt(V.x, V.y, p.x, p.y)));
+        },
         end: function () {
-          if (!dragOn) return;
+          var t = it.turns[stepI];
           var reading = C.ringReading(cur, it.style, it.ring);
-          if (Math.abs(reading - expect) <= 2) {
-            dragOn = false; hd.setAttribute('visibility', 'hidden');
-            setStick(thetaOf(expect, it.style, it.ring));
-            AP.ray(trail, V.x, V.y, thetaOf(expect, it.style, it.ring), R + 30, 'clock-start');
-            pos = expect; stepI++;
-            if (stepI === it.turns.length) {
-              UI.say(ui.msg, '對！最後竹籤停在' + RING[it.ring] + '的 ' + pos + ' 度。', 'ok');
-              nextBtn(ui, idx === cfg.items.length - 1, api, function () { idx++; load(); });
-            } else { UI.say(ui.msg, '對！停在 ' + pos + ' 度。接著轉下一步。', 'ok'); showStep(); }
+          if (Math.abs(reading - targetPos) <= 4) {
+            setStick(targetTheta);
+            var col = t.dir === 'ccw' ? '#1565c0' : '#d32f2f';
+            var aid = addArrowDefs(ui.svg, col);
+            if (!currentArc) {
+              currentArc = AP.el('path', {
+                'class': 'turn-arc' + (t.dir === 'ccw' ? ' turn-arc-ccw' : ''),
+                style: 'stroke: ' + col + '; stroke-width: 3.5;',
+                'marker-end': 'url(#' + aid + ')'
+              }, trail);
+            }
+            currentArc.setAttribute('d', AP.arcPath(startTheta, targetTheta, R * 0.45));
+            hasTurned = true;
+            turnBtn.textContent = '✓ 已轉動 ' + t.deg + '°';
+            turnBtn.disabled = true;
+
+            if (expect === targetPos) {
+              AP.ray(trail, V.x, V.y, targetTheta, R + 30, 'clock-start');
+              pos = targetPos; stepI++;
+              if (stepI === it.turns.length) {
+                UI.say(ui.msg, '對！最後竹籤停在' + RING[it.ring] + '的 ' + pos + ' 度。', 'ok');
+                nextBtn(ui, idx === cfg.items.length - 1, api, function () { idx++; load(); });
+              } else {
+                UI.say(ui.msg, '對！停在 ' + pos + ' 度。接著轉下一步。', 'ok');
+                showStep();
+              }
+            } else {
+              goBtn.classList.add('primary');
+              inp.focus();
+              UI.say(ui.msg, '轉好了！請看量角器刻度，竹籤現在停在幾度？填入後按「確定」。');
+            }
           } else {
-            UI.say(ui.msg, '竹籤停的位置和你算的 ' + expect + ' 度不一樣，再轉轉看。', 'bad');
+            UI.say(ui.msg, '竹籤現在停在 ' + reading + ' 度，題目是要往' + DIR[t.dir] + '轉 ' + t.deg + '°。可以點按鈕直接轉動。', 'bad');
           }
         }
       });
+
       function showStep() {
         var t = it.turns[stepI];
+        hasTurned = false;
+        expect = null;
+        startTheta = thetaOf(pos, it.style, it.ring);
+        targetPos = C.stickAfter(pos, t.dir, t.deg, it.style, it.ring);
+        targetTheta = thetaOf(targetPos, it.style, it.ring);
+        currentArc = null;
+
         var startText = stepI === 0 ? '從' + RING[it.ring] + ' 0 度線開始，' : '接著，';
         stepText.textContent = '第 ' + (stepI + 1) + ' 步：' + startText + '往' + DIR[t.dir] + '方向轉 ' + t.deg + '°。';
-        inp.value = ''; inp.disabled = false; goBtn.disabled = false;
+
+        turnBtn.textContent = '往' + DIR[t.dir] + '轉 ' + t.deg + '°';
+        turnBtn.disabled = false;
+        turnBtn.classList.add('primary');
+        turnBtn.onclick = doTurn;
+
+        inp.value = '';
+        inp.disabled = false;
+        inp.classList.remove('okf', 'badf');
+        goBtn.disabled = false;
+        goBtn.classList.remove('primary');
+
+        UI.say(ui.msg, '可以先點「往' + DIR[t.dir] + '轉 ' + t.deg + '°」按鈕（或拖動竹籤端點），轉完再看刻度填寫。');
       }
+
       goBtn.onclick = function () {
         var v = parseInt(inp.value, 10), t = it.turns[stepI];
         if (isNaN(v)) { UI.say(ui.msg, '先填一個數字。', 'bad'); return; }
         var r = C.diagnoseStick({ answer: v, start: pos, dir: t.dir, deg: t.deg, style: it.style, ring: it.ring });
         if (r.code === 'CORRECT') {
-          expect = v; dragOn = true; inp.disabled = true; goBtn.disabled = true;
-          hd.setAttribute('visibility', 'visible');
-          UI.say(ui.msg, '算好了！拖動竹籤的端點，轉到你算的位置驗證看看。', 'ok');
+          inp.classList.add('okf');
+          inp.classList.remove('badf');
+          if (hasTurned) {
+            AP.ray(trail, V.x, V.y, targetTheta, R + 30, 'clock-start');
+            pos = targetPos; stepI++;
+            if (stepI === it.turns.length) {
+              UI.say(ui.msg, '對！最後竹籤停在' + RING[it.ring] + '的 ' + pos + ' 度。', 'ok');
+              nextBtn(ui, idx === cfg.items.length - 1, api, function () { idx++; load(); });
+            } else {
+              UI.say(ui.msg, '對！停在 ' + pos + ' 度。接著轉下一步。', 'ok');
+              showStep();
+            }
+          } else {
+            expect = v;
+            UI.say(ui.msg, '算好了！拖動竹籤的端點，轉到你算的位置驗證看看。', 'ok');
+          }
         } else if (r.code === 'REVERSED_OP') {
+          inp.classList.add('badf');
           UI.say(ui.msg, '在' + RING[r.ring] + '上，往' + DIR[r.dir] + '轉，數字是變大還是變小？', 'bad');
         } else {
+          inp.classList.add('badf');
           UI.say(ui.msg, '竹籤現在停在 ' + pos + ' 度，一步一步轉轉看。', 'bad');
         }
       };

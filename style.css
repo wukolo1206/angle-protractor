@@ -136,6 +136,8 @@ input.num.badf { border-color: var(--bad); background: var(--bad-bg); }
 .clock-hand { stroke: #d32f2f; stroke-width: 5; stroke-linecap: round; }
 .clock-start { stroke: #d32f2f; stroke-width: 3; stroke-dasharray: 6 5; }
 .turn-arc { fill: none; stroke: #d32f2f; stroke-width: 3; }
+.turn-arc.turn-arc-ccw, .turn-arc-ccw { stroke: #1565c0 !important; }
+.clock-div-lines line { pointer-events: none; }
 .lens-ring { fill: none; stroke: #263238; stroke-width: 2; }
 
 /* 過關打勾與獎勵畫面 */
