@@ -2,9 +2,9 @@
 project: 量角器與角度（四上第三單元）
 category: 學科工具集
 status: 開發中
-version: "v1.7.0 活動三探索逆時針、12等分線與竹籤先轉後讀"
+version: "v1.8.0 活動三自訂起點、鐘面累積度數顯示、大於180度角度數徽章與竹籤算式看板"
 url: https://wukolo1206.github.io/angle-protractor/
-next_action: 測試活動三探索逆時針、12等分線與竹籤連續旋轉先轉後讀功能
+next_action: 依使用者後續反饋持續優化或驗收四上第三單元角度互動教具
 updated: 2026-09-30
 ---
 

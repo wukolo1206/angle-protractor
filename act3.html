@@ -184,22 +184,66 @@
   // E2 問3–4 印p42
   function exStep() {
     exTitle.textContent = '一大格是幾度？';
-    var n = 0, dir = 'cw', showDiv = false;
-    var bCw, bCcw, bStep, bDiv, bReset;
+    var n = 0, dir = 'cw', showDiv = false, start = 12;
+    var bCw, bCcw, bStep, bDiv, bReset, spStartVal;
 
     function draw() {
       AP.clear(exSvg);
-      exText.textContent = '指針從 12 開始往' + DIR[dir] + '方向轉，一次轉一大格。';
-      var to = n === 0 ? 12 : (dir === 'cw' ? (n % 12 || 12) : ((12 - n % 12) % 12 || 12));
+      exText.textContent = '指針從 ' + start + ' 開始往' + DIR[dir] + '方向轉，一次轉一大格（30°）。（可點鐘面數字選起點）';
+      var to = n === 0 ? start : (dir === 'cw' ? ((start + n - 1) % 12 + 1) : (((start - n - 1) % 12 + 12) % 12 + 1));
       var color = dir === 'ccw' ? '#1565c0' : '#d32f2f';
-      var g = drawClockTurn(exSvg, 320, 240, 200, 12, to, dir, { noArc: n === 0, color: color });
+      var g = drawClockTurn(exSvg, 320, 240, 200, start, to, dir, { noArc: n === 0, color: color });
+
+      // 在鐘面數字上加入點選事件，並標註當前起點
+      for (var numI = 1; numI <= 12; numI++) {
+        (function (targetNum) {
+          var ang = AP.numberAngle(targetNum);
+          var numPt = AP.pt(ang, 148);
+          // 若為起點，畫一個淡綠色圓圈光環標示起點
+          if (targetNum === start) {
+            AP.el('circle', {
+              cx: numPt.x, cy: numPt.y, r: 18,
+              fill: 'rgba(0, 150, 136, 0.22)',
+              stroke: '#00796b',
+              'stroke-width': 2,
+              style: 'pointer-events: none;'
+            }, g);
+            var tagPt = AP.pt(ang, 116);
+            var startTag = AP.el('text', {
+              x: tagPt.x, y: tagPt.y + 4,
+              'font-size': 11,
+              'font-weight': 700,
+              'text-anchor': 'middle',
+              fill: '#00796b',
+              style: 'pointer-events: none;'
+            }, g);
+            startTag.textContent = '起點';
+          }
+          // 透明點擊感應區，方便點擊數字切換起點
+          var hitC = AP.el('circle', {
+            cx: numPt.x, cy: numPt.y, r: 20,
+            fill: 'transparent',
+            style: 'cursor: pointer;'
+          }, g);
+          hitC.setAttribute('title', '點擊設為起點 ' + targetNum);
+          hitC.addEventListener('click', function () {
+            if (start !== targetNum) {
+              start = targetNum;
+              n = 0;
+              bStep.disabled = false;
+              if (spStartVal) spStartVal.textContent = start;
+              draw();
+            }
+          });
+        })(numI);
+      }
 
       // 若開啟「12 等分線」：在鐘面上繪製 12 條等分射線
       if (showDiv) {
         var divGroup = AP.el('g', { 'class': 'clock-div-lines' });
         for (var i = 1; i <= 12; i++) {
-          var ang = AP.numberAngle(i);
-          var pOuter = AP.pt(ang, 192);
+          var dAng = AP.numberAngle(i);
+          var pOuter = AP.pt(dAng, 192);
           AP.el('line', {
             x1: 0, y1: 0,
             x2: pOuter.x, y2: pOuter.y,
@@ -211,35 +255,83 @@
         g.insertBefore(divGroup, g.firstChild ? g.firstChild.nextSibling : null);
       }
 
-      // 若有旋轉，繪製扇形微透明底色加強視覺辨識
+      var startAngle = AP.numberAngle(start);
+
+      // 若有旋轉，繪製扇形底色與各大格 30° / 累積度數標籤
       if (n > 0) {
-        var startAngle = AP.numberAngle(12);
         var span = n * 30 * (dir === 'cw' ? -1 : 1);
         if (Math.abs(span) >= 360) span = dir === 'cw' ? -359.5 : 359.5;
         var wedgeEl = AP.el('path', {
           d: AP.wedgePath(startAngle, startAngle + span, 192),
-          fill: dir === 'ccw' ? 'rgba(21, 101, 192, 0.10)' : 'rgba(211, 47, 47, 0.10)',
+          fill: dir === 'ccw' ? 'rgba(21, 101, 192, 0.12)' : 'rgba(211, 47, 47, 0.12)',
           style: 'pointer-events: none;'
         });
         g.insertBefore(wedgeEl, g.firstChild ? g.firstChild.nextSibling : null);
+
+        // 建立度數標籤群組
+        var degGroup = AP.el('g', { 'class': 'clock-deg-labels', style: 'pointer-events: none;' }, g);
+
+        // 1. 每一大格內部標記「30°」
+        for (var k = 1; k <= n; k++) {
+          var midAng = startAngle + (dir === 'cw' ? -1 : 1) * (k - 0.5) * 30;
+          var midPt = AP.pt(midAng, 104);
+          AP.el('rect', {
+            x: midPt.x - 19, y: midPt.y - 11,
+            width: 38, height: 22, rx: 11,
+            fill: '#ffffff',
+            stroke: color,
+            'stroke-width': 1.6
+          }, degGroup);
+          var t30 = AP.el('text', {
+            x: midPt.x, y: midPt.y + 4,
+            'font-size': 13,
+            'font-weight': 700,
+            'text-anchor': 'middle',
+            fill: color
+          }, degGroup);
+          t30.textContent = '30°';
+        }
+
+        // 2. 外圈交界處標記累積度數（30°, 60°, 90°, 120°...）
+        for (var m = 1; m <= n; m++) {
+          var cumAng = startAngle + (dir === 'cw' ? -1 : 1) * m * 30;
+          var cumDeg = m * 30;
+          var cumPt = AP.pt(cumAng, 172);
+          var wBox = cumDeg >= 100 ? 42 : 36;
+          AP.el('rect', {
+            x: cumPt.x - wBox / 2, y: cumPt.y - 11,
+            width: wBox, height: 22, rx: 6,
+            fill: color
+          }, degGroup);
+          var tCum = AP.el('text', {
+            x: cumPt.x, y: cumPt.y + 4,
+            'font-size': 12,
+            'font-weight': 700,
+            'text-anchor': 'middle',
+            fill: '#ffffff'
+          }, degGroup);
+          tCum.textContent = cumDeg + '°';
+        }
       }
 
+      if (spStartVal) spStartVal.textContent = start;
+
       if (n === 0) {
-        var msg0 = showDiv
+        var msg0 = '起點設在 ' + start + '。' + (showDiv
           ? '鐘面一圈 360° 平分成 12 份：360° ÷ 12 ＝ 30°（一大格是 30°）。請按「轉一大格」。'
-          : '按「轉一大格」；也可按「12 等分線」看 360° 分成 12 份。';
+          : '按「轉一大格」；也可按「12 等分線」看 360° 分成 12 份。');
         UI.say(exMsg, msg0);
         return;
       }
 
       var list = [];
       for (var j = 1; j <= n; j++) list.push(j * 30 + '°');
-      var t = '往' + DIR[dir] + '方向轉了 ' + n + ' 大格：' + list.join('、');
-      if (showDiv) {
-        t += '（' + n + ' × 30° ＝ ' + (n * 30) + '°）';
-      }
+      var addExpr = [];
+      for (var a = 0; a < n; a++) addExpr.push('30°');
+      var t = '從 ' + start + ' 往' + DIR[dir] + '方向轉了 ' + n + ' 大格：' + list.join('、') + '。';
+      t += '【累積算式：' + addExpr.join(' ＋ ') + ' ＝ ' + (n * 30) + '°（' + n + ' × 30° ＝ ' + (n * 30) + '°）】';
       if (n === 12) {
-        t += '。指針轉一圈是轉了 360 度，我們稱 360 度的角是周角。';
+        t += ' 指針轉一整圈是轉了 360 度，我們稱 360 度的角是周角。';
       }
       UI.say(exMsg, t, 'ok');
     }
@@ -287,8 +379,43 @@
       }
     });
 
+    spStartVal = h('span', {
+      text: start,
+      style: 'font-weight: 700; font-size: 1.25rem; min-width: 32px; text-align: center; display: inline-block; color: #00695c;'
+    });
+
+    var bStartMinus = h('button', {
+      'class': 'btn',
+      text: '－',
+      title: '起點往前一個數字',
+      onclick: function () {
+        start = (start + 10) % 12 + 1;
+        n = 0;
+        bStep.disabled = false;
+        spStartVal.textContent = start;
+        draw();
+      }
+    });
+
+    var bStartPlus = h('button', {
+      'class': 'btn',
+      text: '＋',
+      title: '起點往後一個數字',
+      onclick: function () {
+        start = start % 12 + 1;
+        n = 0;
+        bStep.disabled = false;
+        spStartVal.textContent = start;
+        draw();
+      }
+    });
+
     exCtrl.appendChild(h('div', { 'class': 'row' }, [
-      h('span', { text: '方向：', style: 'font-weight: 600;' }),
+      h('span', { text: '起點：', style: 'font-weight: 600;' }),
+      spStartVal,
+      bStartMinus,
+      bStartPlus,
+      h('span', { text: '方向：', style: 'font-weight: 600; margin-left: 8px;' }),
       bCw,
       bCcw
     ]));
@@ -383,16 +510,134 @@
     exText.textContent = '課本用鐘面 12 轉到 8（240°）。這裡換成一般的旋轉角：OA 不動，拖動 OB 往逆時針方向轉。';
     var O = { x: 320, y: 250 }, R = 190, acc = 60, last = null;
     var id = addArrowDefs(exSvg);
+
+    // 180° 平角參考基準線（往左的虛線）
+    var flatLine = AP.el('line', {
+      x1: O.x, y1: O.y, x2: O.x - R - 10, y2: O.y,
+      stroke: '#90a4ae', 'stroke-width': 1.8, 'stroke-dasharray': '6 4'
+    }, exSvg);
+    var flatTag = AP.el('text', {
+      x: O.x - R - 18, y: O.y + 6,
+      'font-size': 14, 'font-weight': 600, 'text-anchor': 'end', fill: '#546e7a'
+    }, exSvg);
+    flatTag.textContent = '180° (平角)';
+
+    // OA 射線與 A 標籤
     AP.ray(exSvg, O.x, O.y, 0, R + 20, 'ray');
-    var tA = AP.el('text', { x: O.x + R + 26, y: O.y + 6, 'font-size': 22 }, exSvg); tA.textContent = 'A';
+    var tA = AP.el('text', { x: O.x + R + 26, y: O.y + 6, 'font-size': 22, 'font-weight': 700, fill: '#37474f' }, exSvg);
+    tA.textContent = 'A';
+
+    // 旋轉弧線與度數徽章群組
     var arc = AP.el('path', { d: '', 'class': 'turn-arc', transform: 'translate(' + O.x + ' ' + O.y + ')', 'marker-end': 'url(#' + id + ')' }, exSvg);
+    var badgeG = AP.el('g', { 'class': 'deg-badge', style: 'pointer-events: none;' }, exSvg);
+
+    // OB 射線、把手與 B 標籤
     var ob = AP.ray(exSvg, O.x, O.y, acc, R + 20, 'ray2');
-    var tO = AP.el('text', { x: O.x - 26, y: O.y + 26, 'font-size': 22 }, exSvg); tO.textContent = 'O';
-    var hit = AP.el('circle', { cx: O.x, cy: O.y, r: R + 30, fill: 'transparent' }, exSvg);
+    var hdB = AP.el('circle', { r: 12, fill: 'rgba(0, 137, 123, 0.35)', stroke: '#00897b', 'stroke-width': 2.5 }, exSvg);
+    var tB = AP.el('text', { 'font-size': 22, 'font-weight': 700, fill: '#00796b' }, exSvg);
+    tB.textContent = 'B';
+
+    // O 頂點與 O 標籤
+    var tO = AP.el('text', { x: O.x - 26, y: O.y + 26, 'font-size': 22, 'font-weight': 700, fill: '#37474f' }, exSvg);
+    tO.textContent = 'O';
+
+    var hit = AP.el('circle', { cx: O.x, cy: O.y, r: R + 30, fill: 'transparent', style: 'cursor: grab;' }, exSvg);
+
     function draw() {
       AP.setRay(ob, O.x, O.y, acc, R + 20);
       arc.setAttribute('d', AP.arcPath(0, Math.min(acc, 359.5), 60));
+
+      // 更新 B 點與把手位置
+      var pEnd = AP.pt(acc, R + 20);
+      hdB.setAttribute('cx', O.x + pEnd.x);
+      hdB.setAttribute('cy', O.y + pEnd.y);
+      var pB = AP.pt(acc, R + 42);
+      tB.setAttribute('x', O.x + pB.x - 7);
+      tB.setAttribute('y', O.y + pB.y + 8);
+
       var deg = Math.round(acc);
+
+      // 平角參考線高亮
+      if (deg >= 180) {
+        flatLine.setAttribute('stroke', '#37474f');
+        flatLine.setAttribute('stroke-width', '2.2');
+        flatTag.setAttribute('fill', '#d32f2f');
+      } else {
+        flatLine.setAttribute('stroke', '#90a4ae');
+        flatLine.setAttribute('stroke-width', '1.8');
+        flatTag.setAttribute('fill', '#78909c');
+      }
+
+      // 在角度上面直接顯示度數徽章
+      badgeG.innerHTML = '';
+      if (deg > 0) {
+        var midAng = acc / 2;
+        var rBadge = deg > 180 ? 116 : 96;
+        var pMid = AP.pt(midAng, rBadge);
+        var bx = O.x + pMid.x, by = O.y + pMid.y;
+
+        if (deg <= 180) {
+          var bw1 = 66, bh1 = 32;
+          AP.el('rect', {
+            x: bx - bw1 / 2, y: by - bh1 / 2,
+            width: bw1, height: bh1, rx: 8,
+            fill: 'rgba(255, 255, 255, 0.95)',
+            stroke: '#d32f2f',
+            'stroke-width': 2
+          }, badgeG);
+          var txt1 = AP.el('text', {
+            x: bx, y: by + 6,
+            'font-size': 18,
+            'font-weight': 700,
+            'text-anchor': 'middle',
+            fill: '#d32f2f'
+          }, badgeG);
+          txt1.textContent = deg + '°';
+        } else if (deg < 360) {
+          var bw2 = 120, bh2 = 46;
+          AP.el('rect', {
+            x: bx - bw2 / 2, y: by - bh2 / 2,
+            width: bw2, height: bh2, rx: 8,
+            fill: 'rgba(255, 255, 255, 0.96)',
+            stroke: '#d32f2f',
+            'stroke-width': 2
+          }, badgeG);
+          var txtMain = AP.el('text', {
+            x: bx, y: by - 4,
+            'font-size': 18,
+            'font-weight': 700,
+            'text-anchor': 'middle',
+            fill: '#d32f2f'
+          }, badgeG);
+          txtMain.textContent = deg + '°';
+          var txtSub = AP.el('text', {
+            x: bx, y: by + 15,
+            'font-size': 12,
+            'font-weight': 700,
+            'text-anchor': 'middle',
+            fill: '#e65100'
+          }, badgeG);
+          txtSub.textContent = '＝180°＋' + (deg - 180) + '°';
+        } else {
+          var bw3 = 110, bh3 = 34;
+          AP.el('rect', {
+            x: bx - bw3 / 2, y: by - bh3 / 2,
+            width: bw3, height: bh3, rx: 8,
+            fill: 'rgba(255, 255, 255, 0.96)',
+            stroke: '#d32f2f',
+            'stroke-width': 2
+          }, badgeG);
+          var txtFull = AP.el('text', {
+            x: bx, y: by + 6,
+            'font-size': 16,
+            'font-weight': 700,
+            'text-anchor': 'middle',
+            fill: '#d32f2f'
+          }, badgeG);
+          txtFull.textContent = '360° 周角';
+        }
+      }
+
       var t = '從 OA 逆時針旋轉到 OB，旋轉了 ' + deg + '°';
       if (deg > 180 && deg < 360) t += '＝180°＋' + (deg - 180) + '°（先轉一個平角，再多轉 ' + (deg - 180) + '°）';
       if (deg === 180) t += '，是平角';
@@ -427,7 +672,7 @@
   function layout(stage, title) {
     var svg = AP.el('svg', { viewBox: VB });
     var board = h('div', { 'class': 'board' }); board.appendChild(svg);
-    var ui = { svg: svg, prog: h('div', { 'class': 'src' }), q: h('div', { 'class': 'q' }), inputs: h('div'), btns: h('div', { 'class': 'row' }), msg: h('div', { 'class': 'msg' }) };
+    var ui = { board: board, svg: svg, prog: h('div', { 'class': 'src' }), q: h('div', { 'class': 'q' }), inputs: h('div'), btns: h('div', { 'class': 'row' }), msg: h('div', { 'class': 'msg' }) };
     stage.appendChild(h('div', { 'class': 'stage' }, [board, h('div', { 'class': 'side' }, [h('h2', { text: title }), ui.prog, ui.q, ui.inputs, ui.btns, ui.msg])]));
     return ui;
   }
@@ -554,6 +799,12 @@
   function renderStick(stage, api, cfg) {
     var idx = 0, ui = layout(stage, cfg.title);
     var V = { x: 320, y: 420 }, R = 270;
+    var formulaBox = ui.board.querySelector('.stick-formula-box');
+    if (!formulaBox) {
+      formulaBox = h('div', { 'class': 'stick-formula-box' });
+      ui.board.insertBefore(formulaBox, ui.svg);
+    }
+
     function load() {
       var it = cfg.items[idx], stepI = 0, pos = 0;
       ui.prog.textContent = it.src + '　第 ' + (idx + 1) + ' / ' + cfg.items.length + ' 題';
@@ -579,6 +830,69 @@
       var cur = thetaOf(0, it.style, it.ring);
       var hasTurned = false, targetPos = 0, targetTheta = 0, startTheta = 0;
       var currentArc = null, expect = null;
+
+      function updateFormulaBox() {
+        formulaBox.innerHTML = '';
+        var inc = C.ringIncreasesWith(it.style, it.ring);
+        var header = h('div', {
+          style: 'display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; flex-wrap: wrap; gap: 4px;'
+        }, [
+          h('span', {
+            text: '📐 操作過程算式（從圖像轉化為算式）：',
+            style: 'font-weight: 700; color: #1b5e20; font-size: 1rem;'
+          }),
+          h('span', {
+            text: RING[it.ring] + '：' + (inc === 'cw' ? '順時針刻度變大（＋）、逆時針變小（－）' : '逆時針刻度變大（＋）、順時針變小（－）'),
+            style: 'font-size: 0.85rem; color: #558b2f;'
+          })
+        ]);
+        formulaBox.appendChild(header);
+
+        var listRow = h('div', {
+          style: 'display: flex; flex-wrap: wrap; gap: 8px; align-items: center;'
+        });
+
+        var runPos = 0;
+        for (var k = 0; k < it.turns.length; k++) {
+          var turnK = it.turns[k];
+          var isAdd = (turnK.dir === inc);
+          var opChar = isAdd ? '＋' : '－';
+          var endPos = isAdd ? (runPos + turnK.deg) : (runPos - turnK.deg);
+
+          var pill = h('div', {
+            style: 'padding: 5px 12px; border-radius: 16px; font-size: 0.95rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;'
+          });
+
+          if (k < stepI) {
+            pill.style.background = '#ffffff';
+            pill.style.border = '1.5px solid #81c784';
+            pill.style.color = '#2e7d32';
+            pill.textContent = '第 ' + (k + 1) + ' 步：' + runPos + '° ' + opChar + ' ' + turnK.deg + '° ＝ ' + endPos + '° ✓';
+          } else if (k === stepI) {
+            if (hasTurned) {
+              pill.style.background = '#fff9c4';
+              pill.style.border = '2px solid #fbc02d';
+              pill.style.color = '#e65100';
+              pill.style.fontWeight = '700';
+              pill.textContent = '第 ' + (k + 1) + ' 步：' + runPos + '° ' + opChar + ' ' + turnK.deg + '° ＝ ' + endPos + '°';
+            } else {
+              pill.style.background = '#e3f2fd';
+              pill.style.border = '2px solid #1976d2';
+              pill.style.color = '#0d47a1';
+              pill.style.fontWeight = '700';
+              pill.textContent = '第 ' + (k + 1) + ' 步：' + runPos + '° ' + opChar + ' ' + turnK.deg + '° ＝ ？';
+            }
+          } else {
+            pill.style.background = '#fafafa';
+            pill.style.border = '1px dashed #bdbdbd';
+            pill.style.color = '#9e9e9e';
+            pill.textContent = '第 ' + (k + 1) + ' 步：往' + DIR[turnK.dir] + '轉 ' + turnK.deg + '°';
+          }
+          listRow.appendChild(pill);
+          runPos = endPos;
+        }
+        formulaBox.appendChild(listRow);
+      }
 
       function setStick(t) {
         cur = t;
@@ -614,7 +928,8 @@
           turnBtn.textContent = '✓ 已轉動 ' + t.deg + '°';
           goBtn.classList.add('primary');
           inp.focus();
-          UI.say(ui.msg, '轉好了！請看量角器刻度，竹籤現在停在幾度？填入後按「確定」。');
+          updateFormulaBox();
+          UI.say(ui.msg, '轉好了！請看量角器刻度或上方算式，竹籤現在停在幾度？填入後按「確定」。');
         });
       }
 
@@ -640,10 +955,12 @@
             hasTurned = true;
             turnBtn.textContent = '✓ 已轉動 ' + t.deg + '°';
             turnBtn.disabled = true;
+            updateFormulaBox();
 
             if (expect === targetPos) {
               AP.ray(trail, V.x, V.y, targetTheta, R + 30, 'clock-start');
               pos = targetPos; stepI++;
+              updateFormulaBox();
               if (stepI === it.turns.length) {
                 UI.say(ui.msg, '對！最後竹籤停在' + RING[it.ring] + '的 ' + pos + ' 度。', 'ok');
                 nextBtn(ui, idx === cfg.items.length - 1, api, function () { idx++; load(); });
@@ -654,7 +971,7 @@
             } else {
               goBtn.classList.add('primary');
               inp.focus();
-              UI.say(ui.msg, '轉好了！請看量角器刻度，竹籤現在停在幾度？填入後按「確定」。');
+              UI.say(ui.msg, '轉好了！請看量角器刻度或上方算式，竹籤現在停在幾度？填入後按「確定」。');
             }
           } else {
             UI.say(ui.msg, '竹籤現在停在 ' + reading + ' 度，題目是要往' + DIR[t.dir] + '轉 ' + t.deg + '°。可以點按鈕直接轉動。', 'bad');
@@ -671,8 +988,12 @@
         targetTheta = thetaOf(targetPos, it.style, it.ring);
         currentArc = null;
 
-        var startText = stepI === 0 ? '從' + RING[it.ring] + ' 0 度線開始，' : '接著，';
-        stepText.textContent = '第 ' + (stepI + 1) + ' 步：' + startText + '往' + DIR[t.dir] + '方向轉 ' + t.deg + '°。';
+        var inc = C.ringIncreasesWith(it.style, it.ring);
+        var isAdd = (t.dir === inc);
+        var opChar = isAdd ? '＋' : '－';
+        var opHint = isAdd ? '刻度變大，算式用加法（＋）' : '刻度變小，算式用減法（－）';
+        var startText = stepI === 0 ? '從' + RING[it.ring] + ' 0 度線開始，' : '接著從 ' + pos + ' 度開始，';
+        stepText.textContent = '第 ' + (stepI + 1) + ' 步：' + startText + '往' + DIR[t.dir] + '方向轉 ' + t.deg + '°。（' + opHint + '：' + pos + '° ' + opChar + ' ' + t.deg + '°）';
 
         turnBtn.textContent = '往' + DIR[t.dir] + '轉 ' + t.deg + '°';
         turnBtn.disabled = false;
@@ -685,6 +1006,7 @@
         goBtn.disabled = false;
         goBtn.classList.remove('primary');
 
+        updateFormulaBox();
         UI.say(ui.msg, '可以先點「往' + DIR[t.dir] + '轉 ' + t.deg + '°」按鈕（或拖動竹籤端點），轉完再看刻度填寫。');
       }
 
@@ -692,29 +1014,35 @@
         var v = parseInt(inp.value, 10), t = it.turns[stepI];
         if (isNaN(v)) { UI.say(ui.msg, '先填一個數字。', 'bad'); return; }
         var r = C.diagnoseStick({ answer: v, start: pos, dir: t.dir, deg: t.deg, style: it.style, ring: it.ring });
+        var inc = C.ringIncreasesWith(it.style, it.ring);
+        var isAdd = (t.dir === inc);
+        var opChar = isAdd ? '＋' : '－';
         if (r.code === 'CORRECT') {
           inp.classList.add('okf');
           inp.classList.remove('badf');
           if (hasTurned) {
             AP.ray(trail, V.x, V.y, targetTheta, R + 30, 'clock-start');
+            var prevPos = pos;
             pos = targetPos; stepI++;
+            updateFormulaBox();
             if (stepI === it.turns.length) {
-              UI.say(ui.msg, '對！最後竹籤停在' + RING[it.ring] + '的 ' + pos + ' 度。', 'ok');
+              UI.say(ui.msg, '對！算式是 ' + prevPos + '° ' + opChar + ' ' + t.deg + '° ＝ ' + pos + '°。最後竹籤停在' + RING[it.ring] + '的 ' + pos + ' 度。', 'ok');
               nextBtn(ui, idx === cfg.items.length - 1, api, function () { idx++; load(); });
             } else {
-              UI.say(ui.msg, '對！停在 ' + pos + ' 度。接著轉下一步。', 'ok');
+              UI.say(ui.msg, '對！算式是 ' + prevPos + '° ' + opChar + ' ' + t.deg + '° ＝ ' + pos + '°。接著轉下一步。', 'ok');
               showStep();
             }
           } else {
             expect = v;
+            updateFormulaBox();
             UI.say(ui.msg, '算好了！拖動竹籤的端點，轉到你算的位置驗證看看。', 'ok');
           }
         } else if (r.code === 'REVERSED_OP') {
           inp.classList.add('badf');
-          UI.say(ui.msg, '在' + RING[r.ring] + '上，往' + DIR[r.dir] + '轉，數字是變大還是變小？', 'bad');
+          UI.say(ui.msg, '在' + RING[r.ring] + '上，往' + DIR[r.dir] + '轉刻度是' + (isAdd ? '變大，算式應該用加法（＋）' : '變小，算式應該用減法（－）') + '，再算一次。', 'bad');
         } else {
           inp.classList.add('badf');
-          UI.say(ui.msg, '竹籤現在停在 ' + pos + ' 度，一步一步轉轉看。', 'bad');
+          UI.say(ui.msg, '竹籤現在停在 ' + pos + ' 度，一步一步照算式轉轉看。', 'bad');
         }
       };
       showStep();

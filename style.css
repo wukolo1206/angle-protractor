@@ -138,7 +138,18 @@ input.num.badf { border-color: var(--bad); background: var(--bad-bg); }
 .turn-arc { fill: none; stroke: #d32f2f; stroke-width: 3; }
 .turn-arc.turn-arc-ccw, .turn-arc-ccw { stroke: #1565c0 !important; }
 .clock-div-lines line { pointer-events: none; }
+.clock-deg-labels { pointer-events: none; }
+.deg-badge { pointer-events: none; }
 .lens-ring { fill: none; stroke: #263238; stroke-width: 2; }
+
+/* 操作過程算式卡片 */
+.stick-formula-box {
+  background: #f1f8e9;
+  border: 2px solid #a5d6a7;
+  border-radius: 12px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+}
 
 /* 過關打勾與獎勵畫面 */
 .levels button.done::before { content: '✓ '; color: var(--ok); font-weight: 700; }
