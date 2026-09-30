@@ -184,12 +184,12 @@
   // E2 問3–4 印p42
   function exStep() {
     exTitle.textContent = '一大格是幾度？';
-    var n = 0, dir = 'cw', showDiv = false, start = 12;
-    var bCw, bCcw, bStep, bDiv, bReset, spStartVal;
+    var n = 0, dir = 'cw', showDiv = false, showDeg = true, start = 12;
+    var bCw, bCcw, bStep, bDiv, bDeg, bReset, spStartVal;
 
     function draw() {
       AP.clear(exSvg);
-      exText.textContent = '指針從 ' + start + ' 開始往' + DIR[dir] + '方向轉，一次轉一大格（30°）。（可點鐘面數字選起點）';
+      exText.textContent = '指針從 ' + start + ' 開始往' + DIR[dir] + '方向轉，一次轉一大格（30°）。（可點鐘面數字選起點，可切換「顯示角度」）';
       var to = n === 0 ? start : (dir === 'cw' ? ((start + n - 1) % 12 + 1) : (((start - n - 1) % 12 + 12) % 12 + 1));
       var color = dir === 'ccw' ? '#1565c0' : '#d32f2f';
       var g = drawClockTurn(exSvg, 320, 240, 200, start, to, dir, { noArc: n === 0, color: color });
@@ -268,49 +268,51 @@
         });
         g.insertBefore(wedgeEl, g.firstChild ? g.firstChild.nextSibling : null);
 
-        // 建立度數標籤群組
-        var degGroup = AP.el('g', { 'class': 'clock-deg-labels', style: 'pointer-events: none;' }, g);
+        // 若開啟「顯示角度」：建立度數標籤群組
+        if (showDeg) {
+          var degGroup = AP.el('g', { 'class': 'clock-deg-labels', style: 'pointer-events: none;' }, g);
 
-        // 1. 每一大格內部標記「30°」
-        for (var k = 1; k <= n; k++) {
-          var midAng = startAngle + (dir === 'cw' ? -1 : 1) * (k - 0.5) * 30;
-          var midPt = AP.pt(midAng, 104);
-          AP.el('rect', {
-            x: midPt.x - 19, y: midPt.y - 11,
-            width: 38, height: 22, rx: 11,
-            fill: '#ffffff',
-            stroke: color,
-            'stroke-width': 1.6
-          }, degGroup);
-          var t30 = AP.el('text', {
-            x: midPt.x, y: midPt.y + 4,
-            'font-size': 13,
-            'font-weight': 700,
-            'text-anchor': 'middle',
-            fill: color
-          }, degGroup);
-          t30.textContent = '30°';
-        }
+          // 1. 每一大格內部標記「30°」
+          for (var k = 1; k <= n; k++) {
+            var midAng = startAngle + (dir === 'cw' ? -1 : 1) * (k - 0.5) * 30;
+            var midPt = AP.pt(midAng, 104);
+            AP.el('rect', {
+              x: midPt.x - 19, y: midPt.y - 11,
+              width: 38, height: 22, rx: 11,
+              fill: '#ffffff',
+              stroke: color,
+              'stroke-width': 1.6
+            }, degGroup);
+            var t30 = AP.el('text', {
+              x: midPt.x, y: midPt.y + 4,
+              'font-size': 13,
+              'font-weight': 700,
+              'text-anchor': 'middle',
+              fill: color
+            }, degGroup);
+            t30.textContent = '30°';
+          }
 
-        // 2. 外圈交界處標記累積度數（30°, 60°, 90°, 120°...）
-        for (var m = 1; m <= n; m++) {
-          var cumAng = startAngle + (dir === 'cw' ? -1 : 1) * m * 30;
-          var cumDeg = m * 30;
-          var cumPt = AP.pt(cumAng, 172);
-          var wBox = cumDeg >= 100 ? 42 : 36;
-          AP.el('rect', {
-            x: cumPt.x - wBox / 2, y: cumPt.y - 11,
-            width: wBox, height: 22, rx: 6,
-            fill: color
-          }, degGroup);
-          var tCum = AP.el('text', {
-            x: cumPt.x, y: cumPt.y + 4,
-            'font-size': 12,
-            'font-weight': 700,
-            'text-anchor': 'middle',
-            fill: '#ffffff'
-          }, degGroup);
-          tCum.textContent = cumDeg + '°';
+          // 2. 外圈交界處標記累積度數（30°, 60°, 90°, 120°...）
+          for (var m = 1; m <= n; m++) {
+            var cumAng = startAngle + (dir === 'cw' ? -1 : 1) * m * 30;
+            var cumDeg = m * 30;
+            var cumPt = AP.pt(cumAng, 172);
+            var wBox = cumDeg >= 100 ? 42 : 36;
+            AP.el('rect', {
+              x: cumPt.x - wBox / 2, y: cumPt.y - 11,
+              width: wBox, height: 22, rx: 6,
+              fill: color
+            }, degGroup);
+            var tCum = AP.el('text', {
+              x: cumPt.x, y: cumPt.y + 4,
+              'font-size': 12,
+              'font-weight': 700,
+              'text-anchor': 'middle',
+              fill: '#ffffff'
+            }, degGroup);
+            tCum.textContent = cumDeg + '°';
+          }
         }
       }
 
@@ -319,7 +321,7 @@
       if (n === 0) {
         var msg0 = '起點設在 ' + start + '。' + (showDiv
           ? '鐘面一圈 360° 平分成 12 份：360° ÷ 12 ＝ 30°（一大格是 30°）。請按「轉一大格」。'
-          : '按「轉一大格」；也可按「12 等分線」看 360° 分成 12 份。');
+          : '按「轉一大格」；也可按「12 等分線」或「顯示角度」輔助觀察。');
         UI.say(exMsg, msg0);
         return;
       }
@@ -328,8 +330,13 @@
       for (var j = 1; j <= n; j++) list.push(j * 30 + '°');
       var addExpr = [];
       for (var a = 0; a < n; a++) addExpr.push('30°');
-      var t = '從 ' + start + ' 往' + DIR[dir] + '方向轉了 ' + n + ' 大格：' + list.join('、') + '。';
-      t += '【累積算式：' + addExpr.join(' ＋ ') + ' ＝ ' + (n * 30) + '°（' + n + ' × 30° ＝ ' + (n * 30) + '°）】';
+      var t = '從 ' + start + ' 往' + DIR[dir] + '方向轉了 ' + n + ' 大格';
+      if (showDeg) {
+        t += '：' + list.join('、') + '。';
+        t += '【累積算式：' + addExpr.join(' ＋ ') + ' ＝ ' + (n * 30) + '°（' + n + ' × 30° ＝ ' + (n * 30) + '°）】';
+      } else {
+        t += '。轉了幾度呢？（可按「顯示角度」核對）';
+      }
       if (n === 12) {
         t += ' 指針轉一整圈是轉了 360 度，我們稱 360 度的角是周角。';
       }
@@ -365,6 +372,17 @@
       onclick: function () {
         showDiv = !showDiv;
         bDiv.classList.toggle('sel', showDiv);
+        draw();
+      }
+    });
+
+    bDeg = h('button', {
+      'class': 'btn sel',
+      text: '顯示角度',
+      title: '切換是否在鐘面上顯示度數',
+      onclick: function () {
+        showDeg = !showDeg;
+        bDeg.classList.toggle('sel', showDeg);
         draw();
       }
     });
@@ -421,7 +439,10 @@
     ]));
     exCtrl.appendChild(h('div', { 'class': 'row' }, [
       bStep,
-      bDiv,
+      bDiv
+    ]));
+    exCtrl.appendChild(h('div', { 'class': 'row' }, [
+      bDeg,
       bReset
     ]));
 
