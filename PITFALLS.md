@@ -61,3 +61,17 @@
 **原因**：測試連點三次「下一題」，但下一題要答對才出現按鈕——是測試寫錯，不是產品壞
 **解法**：每題先作答再按下一題
 **未來避免**：測試失敗先確認是產品壞了還是測試寫壞
+
+---
+
+## SVG 箭頭 Marker 顏色與 CSS stroke 權重問題
+
+**現象**：逆時針弧線改設藍色後，箭頭依然是紅色或弧線依然被 CSS 覆蓋為紅色
+**原因**：
+1. CSS `.turn-arc` 具有 `stroke: #d32f2f;` 規則，若直接在 JS 設定 class 或 style，易被 CSS 覆蓋。
+2. SVG `<marker>` 箭頭使用內嵌 `fill` 顏色，若所有弧線共用同一個 marker ID，箭頭顏色無法隨弧線變色。
+**解法**：
+1. CSS 增加 `.turn-arc.turn-arc-ccw, .turn-arc-ccw { stroke: #1565c0 !important; }`。
+2. 封裝 `addArrowDefs(svg, color)` 動態生成特定顏色的 marker ID，按顏色綁定 `marker-end`。
+**未來避免**：SVG 動態多色標記須確保 marker defs 與 CSS 優先級同步。
+
