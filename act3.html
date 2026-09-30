@@ -885,29 +885,23 @@
           });
 
           if (k < stepI) {
+            // 寫完且操作完：算式正式出現！
             pill.style.background = '#ffffff';
             pill.style.border = '1.5px solid #81c784';
             pill.style.color = '#2e7d32';
             pill.textContent = '第 ' + (k + 1) + ' 步：' + runPos + '° ' + opChar + ' ' + turnK.deg + '° ＝ ' + endPos + '° ✓';
           } else if (k === stepI) {
-            if (hasTurned) {
-              pill.style.background = '#fff9c4';
-              pill.style.border = '2px solid #fbc02d';
-              pill.style.color = '#e65100';
-              pill.style.fontWeight = '700';
-              pill.textContent = '第 ' + (k + 1) + ' 步：' + runPos + '° ' + opChar + ' ' + turnK.deg + '° ＝ ' + endPos + '°';
-            } else {
-              pill.style.background = '#e3f2fd';
-              pill.style.border = '2px solid #1976d2';
-              pill.style.color = '#0d47a1';
-              pill.style.fontWeight = '700';
-              pill.textContent = '第 ' + (k + 1) + ' 步：' + runPos + '° ' + opChar + ' ' + turnK.deg + '° ＝ ？';
-            }
+            // 進行中的步驟：不提前劇透，等寫完並操作完才出現
+            pill.style.background = '#f5f5f5';
+            pill.style.border = '1.5px dashed #90caf9';
+            pill.style.color = '#1565c0';
+            pill.textContent = '第 ' + (k + 1) + ' 步：（操作轉動並填答後出現算式）';
           } else {
+            // 未來步驟：待完成
             pill.style.background = '#fafafa';
             pill.style.border = '1px dashed #bdbdbd';
             pill.style.color = '#9e9e9e';
-            pill.textContent = '第 ' + (k + 1) + ' 步：往' + DIR[turnK.dir] + '轉 ' + turnK.deg + '°';
+            pill.textContent = '第 ' + (k + 1) + ' 步：待完成';
           }
           listRow.appendChild(pill);
           runPos = endPos;
@@ -947,10 +941,24 @@
           currentArc.setAttribute('d', AP.arcPath(startTheta, targetTheta, R * 0.45));
           hasTurned = true;
           turnBtn.textContent = '✓ 已轉動 ' + t.deg + '°';
-          goBtn.classList.add('primary');
-          inp.focus();
-          updateFormulaBox();
-          UI.say(ui.msg, '轉好了！請看量角器刻度或上方算式，竹籤現在停在幾度？填入後按「確定」。');
+
+          if (expect === targetPos) {
+            // 之前已經填寫正確答案，現在轉動完成：寫完且操作完！
+            AP.ray(trail, V.x, V.y, targetTheta, R + 30, 'clock-start');
+            pos = targetPos; stepI++;
+            updateFormulaBox();
+            if (stepI === it.turns.length) {
+              UI.say(ui.msg, '對！最後竹籤停在' + RING[it.ring] + '的 ' + pos + ' 度。', 'ok');
+              nextBtn(ui, idx === cfg.items.length - 1, api, function () { idx++; load(); });
+            } else {
+              UI.say(ui.msg, '對！停在 ' + pos + ' 度。接著轉下一步。', 'ok');
+              showStep();
+            }
+          } else {
+            goBtn.classList.add('primary');
+            inp.focus();
+            UI.say(ui.msg, '轉好了！請看量角器刻度，竹籤現在停在幾度？填入後按「確定」。');
+          }
         });
       }
 
@@ -976,9 +984,9 @@
             hasTurned = true;
             turnBtn.textContent = '✓ 已轉動 ' + t.deg + '°';
             turnBtn.disabled = true;
-            updateFormulaBox();
 
             if (expect === targetPos) {
+              // 之前已經填寫正確答案，現在拖曳完成：寫完且操作完！
               AP.ray(trail, V.x, V.y, targetTheta, R + 30, 'clock-start');
               pos = targetPos; stepI++;
               updateFormulaBox();
@@ -992,7 +1000,7 @@
             } else {
               goBtn.classList.add('primary');
               inp.focus();
-              UI.say(ui.msg, '轉好了！請看量角器刻度或上方算式，竹籤現在停在幾度？填入後按「確定」。');
+              UI.say(ui.msg, '轉好了！請看量角器刻度，竹籤現在停在幾度？填入後按「確定」。');
             }
           } else {
             UI.say(ui.msg, '竹籤現在停在 ' + reading + ' 度，題目是要往' + DIR[t.dir] + '轉 ' + t.deg + '°。可以點按鈕直接轉動。', 'bad');
@@ -1009,12 +1017,8 @@
         targetTheta = thetaOf(targetPos, it.style, it.ring);
         currentArc = null;
 
-        var inc = C.ringIncreasesWith(it.style, it.ring);
-        var isAdd = (t.dir === inc);
-        var opChar = isAdd ? '＋' : '－';
-        var opHint = isAdd ? '刻度變大，算式用加法（＋）' : '刻度變小，算式用減法（－）';
         var startText = stepI === 0 ? '從' + RING[it.ring] + ' 0 度線開始，' : '接著從 ' + pos + ' 度開始，';
-        stepText.textContent = '第 ' + (stepI + 1) + ' 步：' + startText + '往' + DIR[t.dir] + '方向轉 ' + t.deg + '°。（' + opHint + '：' + pos + '° ' + opChar + ' ' + t.deg + '°）';
+        stepText.textContent = '第 ' + (stepI + 1) + ' 步：' + startText + '往' + DIR[t.dir] + '方向轉 ' + t.deg + '°。';
 
         turnBtn.textContent = '往' + DIR[t.dir] + '轉 ' + t.deg + '°';
         turnBtn.disabled = false;
@@ -1042,21 +1046,22 @@
           inp.classList.add('okf');
           inp.classList.remove('badf');
           if (hasTurned) {
+            // 已操作完，且剛剛寫完了 -> 寫完且操作完！算式正式出現！
             AP.ray(trail, V.x, V.y, targetTheta, R + 30, 'clock-start');
             var prevPos = pos;
             pos = targetPos; stepI++;
             updateFormulaBox();
             if (stepI === it.turns.length) {
-              UI.say(ui.msg, '對！算式是 ' + prevPos + '° ' + opChar + ' ' + t.deg + '° ＝ ' + pos + '°。最後竹籤停在' + RING[it.ring] + '的 ' + pos + ' 度。', 'ok');
+              UI.say(ui.msg, '對！' + (isAdd ? '順時針刻度變大，算式是加法：' : '逆時針刻度變小，算式是減法：') + prevPos + '° ' + opChar + ' ' + t.deg + '° ＝ ' + pos + '°。最後竹籤停在' + RING[it.ring] + '的 ' + pos + ' 度。', 'ok');
               nextBtn(ui, idx === cfg.items.length - 1, api, function () { idx++; load(); });
             } else {
-              UI.say(ui.msg, '對！算式是 ' + prevPos + '° ' + opChar + ' ' + t.deg + '° ＝ ' + pos + '°。接著轉下一步。', 'ok');
+              UI.say(ui.msg, '對！' + (isAdd ? '順時針刻度變大，算式是加法：' : '逆時針刻度變小，算式是減法：') + prevPos + '° ' + opChar + ' ' + t.deg + '° ＝ ' + pos + '°。接著轉下一步。', 'ok');
               showStep();
             }
           } else {
+            // 寫完了，但還沒轉完竹籤
             expect = v;
-            updateFormulaBox();
-            UI.say(ui.msg, '算好了！拖動竹籤的端點，轉到你算的位置驗證看看。', 'ok');
+            UI.say(ui.msg, '算好了！請拖動竹籤端點或點「往' + DIR[t.dir] + '轉 ' + t.deg + '°」按鈕轉動竹籤驗證。轉完後算式就會出現！', 'ok');
           }
         } else if (r.code === 'REVERSED_OP') {
           inp.classList.add('badf');
